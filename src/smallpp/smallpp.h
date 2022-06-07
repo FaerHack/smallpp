@@ -201,20 +201,22 @@ namespace smallpp {
 #define SMPP_BASE_TYPE_FIXED32( name ) SMPP_TYPE_##name
 #define SMPP_BASE_TYPE_FIXED64( name ) SMPP_TYPE_##name
 #define SMPP_BASE_TYPE_DATA( name ) SMPP_DATA_TYPE_##name
-#define SMPP_BASE_TYPE_MESSAGE( ... ) smallpp::data_s
+#define SMPP_BASE_TYPE_MESSAGE( name ) name
+#define SMPP_BASE_TYPE_MESSAGE_DATA( ... ) smallpp::data_s
 #define SMPP_BASE_TYPE_ENUM( name ) name
 
 #define SMPP_DEFAULT_VALUE_VARINT( ... ) 0
 #define SMPP_DEFAULT_VALUE_FIXED32( ... ) 0
 #define SMPP_DEFAULT_VALUE_FIXED64( ... ) 0
 #define SMPP_DEFAULT_VALUE_DATA( ... ) { nullptr, 0 }
-#define SMPP_DEFAULT_VALUE_MESSAGE( ... ) { nullptr, 0 }
-#define SMPP_DEFAULT_VALUE_ENUM( name ) ( name )0 // Is it correct behaviour ?
+#define SMPP_DEFAULT_VALUE_MESSAGE( ... ) { }
+#define SMPP_DEFAULT_VALUE_MESSAGE_DATA( ... ) { nullptr, 0 }
+#define SMPP_DEFAULT_VALUE_ENUM( name ) ( name )0
 
 #define SMPP_GET_TYPE( base_type, type ) SMPP_BASE_TYPE_##base_type( type )
 
 #define SMPP_DEFINE_MEMBER_ENTRY( a, flag, base_type, type, name, tag ) SMPP_GET_TYPE( base_type, type ) name;
-#define SMPP_DEFINE_CONSTRUCTOR_ENTRY( a, flag, base_type, type, name, tag ) name = SMPP_DEFAULT_VALUE_##base_type( type ); // TODO: Add support for enums
+#define SMPP_DEFINE_CONSTRUCTOR_ENTRY( a, flag, base_type, type, name, tag ) name = SMPP_DEFAULT_VALUE_##base_type( type );
 
 #define SMPP_DEFINE_READ_BASE( a, base_type, type, name, function ) \
 uint64_t value = 0; \
@@ -231,6 +233,28 @@ if ( !( bf.read( this->name ) ) ) \
 #define SMPP_DEFINE_READ_TYPE_FIXED32( a, flag, base_type, type, name, tag ) SMPP_DEFINE_READ_TYPE( a, name )
 #define SMPP_DEFINE_READ_TYPE_FIXED64( a, flag, base_type, type, name, tag ) SMPP_DEFINE_READ_TYPE( a, name )
 #define SMPP_DEFINE_READ_TYPE_ENUM( a, flag, base_type, type, name, tag ) SMPP_DEFINE_READ_BASE( a, base_type, type, name, this->read_varint )
+
+#define SMPP_DEFINE_READ_TYPE_MESSAGE( a, flag, base_type, type, name, tag ) \
+uint64_t size = 0; \
+if ( !read_varint( bf, size ) ) \
+	return false; \
+\
+auto buff = bf.get_buffer( ); \
+if ( !bf.skip( size ) ) \
+	return false; \
+\
+if ( !name.parse_from_buffer( buff, size ) ) \
+	return false;
+
+#define SMPP_DEFINE_READ_TYPE_MESSAGE_DATA( a, flag, base_type, type, name, tag ) \
+uint64_t size = 0; \
+if ( !read_varint( bf, size ) ) \
+	return false; \
+\
+this->name.buffer = bf.get_buffer( ); \
+this->name.size = size; \
+if ( !bf.skip( size ) ) \
+	return false;
 
 #define SMPP_DEFINE_READ_TYPE_DATA_STRING( a, flag, base_type, type, name, tag ) \
 uint64_t size = 0; \
@@ -253,16 +277,6 @@ if ( !bf.skip( size ) ) \
 	return false;
 
 #define SMPP_DEFINE_READ_TYPE_DATA( a, flag, base_type, type, name, tag ) SMPP_DEFINE_READ_TYPE_DATA_##type( a, flag, base_type, type, name, tag )
-
-#define SMPP_DEFINE_READ_TYPE_MESSAGE( a, flag, base_type, type, name, tag ) \
-uint64_t size = 0; \
-if ( !read_varint( bf, size ) ) \
-	return false; \
-\
-this->name.buffer = bf.get_buffer( ); \
-this->name.size = size; \
-if ( !bf.skip( size ) ) \
-	return false;
 
 #define SMPP_DEFINE_READ_ENTRY( a, flag, base_type, type_, name, tag ) \
 case tag: \
@@ -303,12 +317,29 @@ void set_##name( decltype( name ) value ) { \
 #define SMPP_DEFINE_CLASS_ENTRY_BASE_MESSAGE( a, flag, base_type, type, name, tag ) \
 bool has_##name( ) const { return this->__INTERNAL_tags.is_set( tag ); } \
 \
+const type& get_##name( ) const { \
+	if ( !this->__INTERNAL_tags.is_set( tag ) ) return { }; \
+	return this->name; \
+} \
+\
+//void set_##name( const type& value) { \
+//	this->__INTERNAL_tags.set( tag, true ); \
+//	this->name = value; \
+//}
+
+#define SMPP_DEFINE_CLASS_ENTRY_BASE_MESSAGE_DATA( a, flag, base_type, type, name, tag ) \
+bool has_##name( ) const { return this->__INTERNAL_tags.is_set( tag ); } \
+\
 bool get_##name( type& out ) const { \
 	if ( !this->__INTERNAL_tags.is_set( tag ) ) return false; \
 	return out.parse_from_buffer( this->name.buffer, this->name.size ); \
 } \
 \
-// TODO: set_* for message
+void set_##name( const uint8_t* buffer, size_t buffer_size ) { \
+	this->__INTERNAL_tags.set( tag, true ); \
+	this->name.buffer = buffer; \
+	this->name.size = buffer_size; \
+} \
 
 #define SMPP_DEFINE_CLASS_ENTRY_DATA_BASE( a, flag, base_type, type, name, tag ) \
 bool has_##name( ) const { return this->__INTERNAL_tags.is_set( tag ); } \
@@ -340,7 +371,9 @@ void set_##name( decltype( name ) value ) { \
 #define SMPP_DEFINE_CLASS_ENTRY( a, flag, base_type, type, name, tag ) \
 SMPP_DEFINE_CLASS_ENTRY_##flag( a, flag, base_type, type, name, tag )
 
-// TODO: repeated support
+#define SMPP_DEFINE_COPY_ENTRY( a, flag, base_type, type, name, tag ) \
+this->name = other.name;
+
 #define SMPP_BIND( name, max_tag ) \
 struct name : public smallpp::base_message { \
 private: \
@@ -351,6 +384,10 @@ public: \
 	name( ) { \
 		this->clear( ); \
 	}\
+\
+	name( const name& other ) { \
+		SMPP_FIELDS_##name( SMPP_DEFINE_COPY_ENTRY, 0 ) \
+	} \
 \
 	bool parse_from_buffer( const uint8_t* buffer, size_t buffer_size ) override { \
 		auto bf = smallpp::bf_reader( buffer, buffer_size ); \

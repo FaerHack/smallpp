@@ -1,5 +1,6 @@
 #include "smallpp.h"
 
+#include <Windows.h>
 #include <stdio.h>
 #include <stdint.h>
 
@@ -9,11 +10,7 @@
 int main( ) {
 	test_message msg;
 	auto result = msg.parse_from_buffer( resources::test_message, sizeof( resources::test_message ) );
-
-	test_message_location location;
-	auto result2 = msg.get_location( location );
-
+	auto location = msg.get_location( );
 	
-
 	return 0;
 }
