@@ -71,6 +71,20 @@ namespace smallpp {
 	};
 
 	// 
+	// Small structs to hold certain data
+	// 
+
+	struct string_s {
+		const char* buffer;
+		size_t length;
+	};
+
+	struct msg_data_s {
+		const uint8_t* buffer;
+		size_t size;
+	};
+
+	// 
 	// Base message with base types and few virtual functions
 	// 
 
@@ -135,47 +149,62 @@ namespace smallpp {
 #define SMPP_TYPE_FLOAT float
 #define SMPP_TYPE_DOUBLE double
 
-#define SMPP_DATA_TYPE_STRING const char*
+#define SMPP_DATA_TYPE_STRING smallpp::string_s
 
 #define SMPP_BASE_TYPE_VARINT( name ) SMPP_TYPE_##name
 #define SMPP_BASE_TYPE_FIXED32( name ) SMPP_TYPE_##name
 #define SMPP_BASE_TYPE_FIXED64( name ) SMPP_TYPE_##name
 #define SMPP_BASE_TYPE_DATA( name ) SMPP_DATA_TYPE_##name
+#define SMPP_BASE_TYPE_MESSAGE( ... ) smallpp::msg_data_s
 #define SMPP_BASE_TYPE_ENUM( name ) name
 
-#define SMPP_DEFAULT_VALUE_VARINT( name ) 0
+#define SMPP_DEFAULT_VALUE_VARINT( ... ) 0
 #define SMPP_DEFAULT_VALUE_FIXED32( ... ) 0
 #define SMPP_DEFAULT_VALUE_FIXED64( ... ) 0
-#define SMPP_DEFAULT_VALUE_DATA( name ) nullptr
-#define SMPP_DEFAULT_VALUE_ENUM( name ) // TODO
+#define SMPP_DEFAULT_VALUE_DATA( ... ) { nullptr, 0 }
+#define SMPP_DEFAULT_VALUE_MESSAGE( ... ) { nullptr, 0 }
+#define SMPP_DEFAULT_VALUE_ENUM( name ) ( name )0 // Is it correct behaviour ?
 
 #define SMPP_GET_TYPE( base_type, type ) SMPP_BASE_TYPE_##base_type( type )
 
 #define SMPP_DEFINE_MEMBER_ENTRY( a, base_type, type, name, tag ) SMPP_GET_TYPE( base_type, type ) name;
 #define SMPP_DEFINE_CONSTRUCTOR_ENTRY( a, base_type, type, name, tag ) name = SMPP_DEFAULT_VALUE_##base_type( type ); // TODO: Add support for enums
 
-#define SMPP_DEFINE_READ_BASE( a, name, function ) \
+#define SMPP_DEFINE_READ_BASE( a, base_type, type, name, function ) \
 uint64_t value = 0; \
 if ( !( function( bf, value ) ) ) \
 	return false; \
 \
-name = value;
+name = ( SMPP_GET_TYPE( base_type, type ) )value;
 
 #define SMPP_DEFINE_READ_TYPE( a, name ) \
 if ( !( bf.read( name ) ) ) \
 	return false;
  
-#define SMPP_DEFINE_READ_TYPE_VARINT( a, base_type, type, name, tag ) SMPP_DEFINE_READ_BASE( a, name, read_varint )
+#define SMPP_DEFINE_READ_TYPE_VARINT( a, base_type, type, name, tag ) SMPP_DEFINE_READ_BASE( a, base_type, type, name, read_varint )
 #define SMPP_DEFINE_READ_TYPE_FIXED32( a, base_type, type, name, tag ) SMPP_DEFINE_READ_TYPE( a, name )
 #define SMPP_DEFINE_READ_TYPE_FIXED64( a, base_type, type, name, tag ) SMPP_DEFINE_READ_TYPE( a, name )
-//#define SMPP_DEFINE_READ_TYPE_ENUM( a, base_type, type, name, tag ) SMPP_DEFINE_READ_BASE( a, name, read_varint )
+#define SMPP_DEFINE_READ_TYPE_ENUM( a, base_type, type, name, tag ) SMPP_DEFINE_READ_BASE( a, base_type, type, name, read_varint )
 
-#define SMPP_DEFINE_READ_TYPE_DATA( a, base_type, type, name, tag ) \
+#define SMPP_DEFINE_READ_TYPE_DATA_STRING( a, base_type, type, name, tag ) \
 uint64_t size = 0; \
 if ( !read_varint( bf, size ) ) \
 	return false; \
 \
-name = ( SMPP_GET_TYPE( base_type, type ) )bf.get_buffer( ); \
+name.buffer = ( const char* )bf.get_buffer( ); \
+name.length = size; \
+if ( !bf.skip( size ) ) \
+	return false;
+
+#define SMPP_DEFINE_READ_TYPE_DATA( a, base_type, type, name, tag ) SMPP_DEFINE_READ_TYPE_DATA_##type( a, base_type, type, name, tag )
+
+#define SMPP_DEFINE_READ_TYPE_MESSAGE( a, base_type, type, name, tag ) \
+uint64_t size = 0; \
+if ( !read_varint( bf, size ) ) \
+	return false; \
+\
+name.buffer = bf.get_buffer( ); \
+name.size = size; \
 if ( !bf.skip( size ) ) \
 	return false;
 
@@ -189,6 +218,20 @@ break; \
 // TODO
 #define SMPP_DEFINE_WRITE_ENTRY( )
 #define SMPP_DEFINE_GET_SIZE_ENTRY( )
+
+#define SMPP_DEFINE_CLASS_ENTRY_TYPE_VARINT( ... )
+#define SMPP_DEFINE_CLASS_ENTRY_TYPE_FIXED32( ... )
+#define SMPP_DEFINE_CLASS_ENTRY_TYPE_FIXED64( ... )
+#define SMPP_DEFINE_CLASS_ENTRY_TYPE_DATA( ... )
+#define SMPP_DEFINE_CLASS_ENTRY_TYPE_ENUM( ... )
+
+#define SMPP_DEFINE_CLASS_ENTRY_TYPE_MESSAGE( a, base_type, type, name, tag ) \
+bool get_##name( type& out ) { \
+	return out.parse_from_buffer( name.buffer, name.size ); \
+}
+
+#define SMPP_DEFINE_CLASS_ENTRY( a, base_type, type, name, tag ) \
+SMPP_DEFINE_CLASS_ENTRY_TYPE_##base_type( a, base_type, type, name, tag )
 
 // TODO: Add support for is_*_set
 // TODO: do some mask shit to ensure all required fields are set and to check if optional fields are indeed set
@@ -242,4 +285,6 @@ struct name : public smallpp::base_message { \
 	size_t get_size( ) override { \
 		return 0; \
 	} \
+\
+	SMPP_FIELDS_##name( SMPP_DEFINE_CLASS_ENTRY, 0 ) \
 };
