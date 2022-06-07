@@ -13,5 +13,7 @@ int main( ) {
 	test_message_location location;
 	auto result2 = msg.get_location( location );
 
+	
+
 	return 0;
 }
