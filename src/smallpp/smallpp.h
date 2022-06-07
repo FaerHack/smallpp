@@ -71,6 +71,39 @@ namespace smallpp {
 	};
 
 	// 
+	// Tiny class to simplify working with bits
+	// 
+
+	constexpr auto BITS_PER_INT = 32;
+	constexpr auto BITSET_INT( int bitNum ) { return ( ( bitNum ) >> 5/*log2(32)*/ ); }
+
+	template<size_t num_bits, size_t num_data = ( num_bits + ( BITS_PER_INT - 1 ) ) / BITS_PER_INT>
+	struct bit_set {
+	public:
+		uint32_t m_data[ num_data ];
+
+		bit_set( ) {
+			clear( );
+		}
+
+		inline bool is_set( int n ) {
+			return ( ( m_data[ BITSET_INT( n ) ] & ( 1U << ( n % BITS_PER_INT ) ) ) != 0 );
+		}
+
+		inline void set( int n, bool v ) {
+			if ( v )
+				m_data[ BITSET_INT( n ) ] |= ( 1U << ( n % BITS_PER_INT ) );
+			else
+				m_data[ BITSET_INT( n ) ] &= ~( 1U << ( n % BITS_PER_INT ) );
+		}
+
+		inline void clear( ) {
+			for ( auto i = 0; i < num_data; i++ )
+				m_data[ i ] = 0;
+		}
+	};
+
+	// 
 	// Small structs to hold certain data
 	// 
 
@@ -79,9 +112,22 @@ namespace smallpp {
 		size_t length;
 	};
 
-	struct msg_data_s {
+	struct data_s {
 		const uint8_t* buffer;
 		size_t size;
+	};
+
+	// 
+	// 
+	// 
+
+	enum class e_wire_type : uint64_t {
+		varint = 0,
+		fixed64 = 1,
+		length_delimited = 2,
+		group_start = 3,
+		group_end = 4,
+		fixed32 = 5,
 	};
 
 	// 
@@ -90,15 +136,6 @@ namespace smallpp {
 
 	class base_message {
 	protected:
-
-		enum class e_wire_type : uint64_t {
-			varint = 0,
-			fixed64 = 1,
-			length_delimited = 2,
-			group_start = 3,
-			group_end = 4,
-			fixed32 = 5,
-		};
 
 		struct field_header_s {
 			e_wire_type type : 3;
@@ -137,6 +174,7 @@ namespace smallpp {
 		virtual bool parse_from_buffer( const uint8_t* buffer, size_t buffer_size ) = 0;
 		virtual bool write_to_buffer( uint8_t* buffer, size_t buffer_size ) = 0;
 		virtual size_t get_size( ) = 0;
+		virtual void clear( ) = 0;
 	};
 
 }
@@ -150,12 +188,20 @@ namespace smallpp {
 #define SMPP_TYPE_DOUBLE double
 
 #define SMPP_DATA_TYPE_STRING smallpp::string_s
+#define SMPP_DATA_TYPE_BYTES smallpp::data_s
+
+#define SMPP_WIRE_TYPE_VARINT smallpp::e_wire_type::varint
+#define SMPP_WIRE_TYPE_FIXED32 smallpp::e_wire_type::fixed32
+#define SMPP_WIRE_TYPE_FIXED64 smallpp::e_wire_type::fixed64
+#define SMPP_WIRE_TYPE_DATA smallpp::e_wire_type::length_delimited
+#define SMPP_WIRE_TYPE_MESSAGE smallpp::e_wire_type::length_delimited
+#define SMPP_WIRE_TYPE_ENUM smallpp::e_wire_type::varint
 
 #define SMPP_BASE_TYPE_VARINT( name ) SMPP_TYPE_##name
 #define SMPP_BASE_TYPE_FIXED32( name ) SMPP_TYPE_##name
 #define SMPP_BASE_TYPE_FIXED64( name ) SMPP_TYPE_##name
 #define SMPP_BASE_TYPE_DATA( name ) SMPP_DATA_TYPE_##name
-#define SMPP_BASE_TYPE_MESSAGE( ... ) smallpp::msg_data_s
+#define SMPP_BASE_TYPE_MESSAGE( ... ) smallpp::data_s
 #define SMPP_BASE_TYPE_ENUM( name ) name
 
 #define SMPP_DEFAULT_VALUE_VARINT( ... ) 0
@@ -167,53 +213,75 @@ namespace smallpp {
 
 #define SMPP_GET_TYPE( base_type, type ) SMPP_BASE_TYPE_##base_type( type )
 
-#define SMPP_DEFINE_MEMBER_ENTRY( a, base_type, type, name, tag ) SMPP_GET_TYPE( base_type, type ) name;
-#define SMPP_DEFINE_CONSTRUCTOR_ENTRY( a, base_type, type, name, tag ) name = SMPP_DEFAULT_VALUE_##base_type( type ); // TODO: Add support for enums
+#define SMPP_DEFINE_MEMBER_ENTRY( a, flag, base_type, type, name, tag ) SMPP_GET_TYPE( base_type, type ) name;
+#define SMPP_DEFINE_CONSTRUCTOR_ENTRY( a, flag, base_type, type, name, tag ) name = SMPP_DEFAULT_VALUE_##base_type( type ); // TODO: Add support for enums
 
 #define SMPP_DEFINE_READ_BASE( a, base_type, type, name, function ) \
 uint64_t value = 0; \
 if ( !( function( bf, value ) ) ) \
 	return false; \
 \
-name = ( SMPP_GET_TYPE( base_type, type ) )value;
+this->name = ( SMPP_GET_TYPE( base_type, type ) )value;
 
 #define SMPP_DEFINE_READ_TYPE( a, name ) \
 if ( !( bf.read( name ) ) ) \
 	return false;
  
-#define SMPP_DEFINE_READ_TYPE_VARINT( a, base_type, type, name, tag ) SMPP_DEFINE_READ_BASE( a, base_type, type, name, read_varint )
-#define SMPP_DEFINE_READ_TYPE_FIXED32( a, base_type, type, name, tag ) SMPP_DEFINE_READ_TYPE( a, name )
-#define SMPP_DEFINE_READ_TYPE_FIXED64( a, base_type, type, name, tag ) SMPP_DEFINE_READ_TYPE( a, name )
-#define SMPP_DEFINE_READ_TYPE_ENUM( a, base_type, type, name, tag ) SMPP_DEFINE_READ_BASE( a, base_type, type, name, read_varint )
+#define SMPP_DEFINE_READ_TYPE_VARINT( a, flag, base_type, type, name, tag ) SMPP_DEFINE_READ_BASE( a, base_type, type, name, read_varint )
+#define SMPP_DEFINE_READ_TYPE_FIXED32( a, flag, base_type, type, name, tag ) SMPP_DEFINE_READ_TYPE( a, name )
+#define SMPP_DEFINE_READ_TYPE_FIXED64( a, flag, base_type, type, name, tag ) SMPP_DEFINE_READ_TYPE( a, name )
+#define SMPP_DEFINE_READ_TYPE_ENUM( a, flag, base_type, type, name, tag ) SMPP_DEFINE_READ_BASE( a, base_type, type, name, read_varint )
 
-#define SMPP_DEFINE_READ_TYPE_DATA_STRING( a, base_type, type, name, tag ) \
+#define SMPP_DEFINE_READ_TYPE_DATA_STRING( a, flag, base_type, type, name, tag ) \
 uint64_t size = 0; \
 if ( !read_varint( bf, size ) ) \
 	return false; \
 \
-name.buffer = ( const char* )bf.get_buffer( ); \
-name.length = size; \
+this->name.buffer = ( const char* )bf.get_buffer( ); \
+this->name.length = size; \
 if ( !bf.skip( size ) ) \
 	return false;
 
-#define SMPP_DEFINE_READ_TYPE_DATA( a, base_type, type, name, tag ) SMPP_DEFINE_READ_TYPE_DATA_##type( a, base_type, type, name, tag )
-
-#define SMPP_DEFINE_READ_TYPE_MESSAGE( a, base_type, type, name, tag ) \
+#define SMPP_DEFINE_READ_TYPE_DATA_BYTES( a, flag, base_type, type, name, tag ) \
 uint64_t size = 0; \
 if ( !read_varint( bf, size ) ) \
 	return false; \
 \
-name.buffer = bf.get_buffer( ); \
-name.size = size; \
+this->name.buffer = bf.get_buffer( ); \
+this->name.size = size; \
 if ( !bf.skip( size ) ) \
 	return false;
 
-#define SMPP_DEFINE_READ_ENTRY( a, base_type, type, name, tag ) \
+#define SMPP_DEFINE_READ_TYPE_DATA( a, flag, base_type, type, name, tag ) SMPP_DEFINE_READ_TYPE_DATA_##type( a, flag, base_type, type, name, tag )
+
+#define SMPP_DEFINE_READ_TYPE_MESSAGE( a, flag, base_type, type, name, tag ) \
+uint64_t size = 0; \
+if ( !read_varint( bf, size ) ) \
+	return false; \
+\
+this->name.buffer = bf.get_buffer( ); \
+this->name.size = size; \
+if ( !bf.skip( size ) ) \
+	return false;
+
+#define SMPP_DEFINE_READ_ENTRY( a, flag, base_type, type_, name, tag ) \
 case tag: \
 { \
-SMPP_DEFINE_READ_TYPE_##base_type( a, base_type, type, name, tag ) \
-break; \
+	if ( field.type != SMPP_WIRE_TYPE_##base_type ) return false; \
+	_tags.set( tag, true ); \
+	SMPP_DEFINE_READ_TYPE_##base_type( a, flag, base_type, type_, name, tag ) \
+	break; \
 }
+
+
+#define SMPP_DEFINE_POST_READ_ENTRY_REQUIRED( a, flag, base_type, type, name, tag ) \
+if ( !this->_tags.is_set( tag ) ) return false;
+
+#define SMPP_DEFINE_POST_READ_ENTRY_OPTIONAL( ... )
+#define SMPP_DEFINE_POST_READ_ENTRY_REPEATED( ... )
+
+#define SMPP_DEFINE_POST_READ_ENTRY( a, flag, base_type, type, name, tag ) SMPP_DEFINE_POST_READ_ENTRY_##flag( a, flag, base_type, type, name, tag )
+
 
 // TODO
 #define SMPP_DEFINE_WRITE_ENTRY( )
@@ -225,26 +293,32 @@ break; \
 #define SMPP_DEFINE_CLASS_ENTRY_TYPE_DATA( ... )
 #define SMPP_DEFINE_CLASS_ENTRY_TYPE_ENUM( ... )
 
-#define SMPP_DEFINE_CLASS_ENTRY_TYPE_MESSAGE( a, base_type, type, name, tag ) \
+#define SMPP_DEFINE_CLASS_ENTRY_TYPE_MESSAGE( a, flag, base_type, type, name, tag ) \
 bool get_##name( type& out ) { \
 	return out.parse_from_buffer( name.buffer, name.size ); \
 }
 
-#define SMPP_DEFINE_CLASS_ENTRY( a, base_type, type, name, tag ) \
-SMPP_DEFINE_CLASS_ENTRY_TYPE_##base_type( a, base_type, type, name, tag )
+#define SMPP_DEFINE_CLASS_ENTRY( a, flag, base_type, type, name, tag ) \
+SMPP_DEFINE_CLASS_ENTRY_TYPE_##base_type( a, flag, base_type, type, name, tag )
 
-// TODO: Add support for is_*_set
-// TODO: do some mask shit to ensure all required fields are set and to check if optional fields are indeed set
-#define SMPP_BIND( name ) \
+// TODO: has_* / get_* / set_* (everything private)
+// TODO: repeated support
+#define SMPP_BIND( name, max_tag ) \
 struct name : public smallpp::base_message { \
+private: \
+	smallpp::bit_set<max_tag> _tags; \
+public: \
 	SMPP_FIELDS_##name( SMPP_DEFINE_MEMBER_ENTRY, 0 ) \
 \
 	name( ) { \
-		SMPP_FIELDS_##name( SMPP_DEFINE_CONSTRUCTOR_ENTRY, 0 ) \
+		this->clear( ); \
 	}\
 \
 	bool parse_from_buffer( const uint8_t* buffer, size_t buffer_size ) override { \
 		auto bf = smallpp::bf_reader( buffer, buffer_size ); \
+\
+		_tags.clear( );\
+\
 		field_header_s field = { }; \
 		while ( read_field( bf, field ) ) { \
 			switch ( field.number ) { \
@@ -252,14 +326,24 @@ struct name : public smallpp::base_message { \
 				default: \
 				{\
 					switch ( field.type ) { \
-						case e_wire_type::varint: \
+						case smallpp::e_wire_type::varint: \
 						{ \
 							uint64_t dummy = 0; \
 							if ( !read_varint( bf, dummy ) ) \
 								return false; \
 							break; \
 						} \
-						case e_wire_type::length_delimited: \
+						case smallpp::e_wire_type::fixed64: \
+						{ \
+							bf.skip( 8 ); \
+							break; \
+						} \
+						case smallpp::e_wire_type::fixed32: \
+						{ \
+							bf.skip( 4 ); \
+							break; \
+						} \
+						case smallpp::e_wire_type::length_delimited: \
 						{ \
 							uint64_t length = 0; \
 							if ( !read_varint( bf, length ) ) \
@@ -273,6 +357,9 @@ struct name : public smallpp::base_message { \
 				}\
 			} \
 		} \
+\
+		SMPP_FIELDS_##name( SMPP_DEFINE_POST_READ_ENTRY, 0 ) \
+\
 		return true; \
 	} \
 \
@@ -285,6 +372,11 @@ struct name : public smallpp::base_message { \
 	size_t get_size( ) override { \
 		return 0; \
 	} \
+\
+	void clear( ) override { \
+		_tags.clear( ); \
+		SMPP_FIELDS_##name( SMPP_DEFINE_CONSTRUCTOR_ENTRY, 0 ) \
+} \
 \
 	SMPP_FIELDS_##name( SMPP_DEFINE_CLASS_ENTRY, 0 ) \
 };
