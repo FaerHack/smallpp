@@ -8,8 +8,6 @@
 #include <string.h>
 
 // TODO:
-// - Add writing
-// - Add get_size
 // - Support repeated
 // - Add more comments and spacing between code sections
 // - Custom setter for string and bytes (remember to write before including string.h about using strlen)
