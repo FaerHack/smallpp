@@ -12,7 +12,6 @@
 // - Add more comments and spacing between code sections
 // - Custom setter for string and bytes (remember to write before including string.h about using strlen)
 // - MESSAGE_DATA setter with message
-// - clear_*
 // - Copy constructor for string_s & data_s
 // - Maybe merge strings and data_s?
 // - Maybe instead of true/false return error code? so we can differentiate between out_of_memory and required_field_not_set for example
@@ -416,12 +415,26 @@ if ( !bf.write_varint( size ) || !bf.write_data( buffer, size ) ) \
 if ( !bf.write_varint( this->name.size ) || !bf.write_data( this->name.buffer, this->name.size ) ) \
 	return false;
 
-#define SMPP_DEFINE_WRITE_ENTRY( a, flag, base_type, type, name, tag ) \
+#define SMPP_DEFINE_WRITE_ENTRY_REQUIRED( a, flag, base_type, type, name, tag ) \
+if ( this->__INTERNAL_tags.is_set( tag ) ) { \
+	if ( !this->write_field( bf, tag, SMPP_WIRE_TYPE_##base_type ) ) \
+		return false; \
+	SMPP_DEFINE_WRITE_ENTRY_##base_type( a, flag, base_type, type, name, tag ) \
+} else { \
+	return false; \
+}
+
+#define SMPP_DEFINE_WRITE_ENTRY_OPTIONAL( a, flag, base_type, type, name, tag ) \
 if ( this->__INTERNAL_tags.is_set( tag ) ) { \
 	if ( !this->write_field( bf, tag, SMPP_WIRE_TYPE_##base_type ) ) \
 		return false; \
 	SMPP_DEFINE_WRITE_ENTRY_##base_type( a, flag, base_type, type, name, tag ) \
 }
+
+#define SMPP_DEFINE_WRITE_ENTRY_REPEATED( a, flag, base_type, type, name, tag ) \
+NOT_IMPLEMENTED_YET
+
+#define SMPP_DEFINE_WRITE_ENTRY( a, flag, base_type, type, name, tag ) SMPP_DEFINE_WRITE_ENTRY_##flag( a, flag, base_type, type, name, tag )
 
 // =====================================
 // 
@@ -451,8 +464,12 @@ if ( this->__INTERNAL_tags.is_set( tag ) ) result += SMPP_FIELD_HDR_SIZE( tag ) 
 // 
 // =====================================
 
-#define SMPP_DEFINE_CLASS_ENTRY_BASE( a, flag, base_type, type, name, tag ) \
+#define SMPP_DEFINE_CLASS_ENTRY_SHARED( a, flag, base_type, type, name, tag ) \
 bool has_##name( ) const { return this->__INTERNAL_tags.is_set( tag ); } \
+void clear_##name( ) { return this->__INTERNAL_tags.set( tag, false ); }
+
+#define SMPP_DEFINE_CLASS_ENTRY_BASE( a, flag, base_type, type, name, tag ) \
+SMPP_DEFINE_CLASS_ENTRY_SHARED( a, flag, base_type, type, name, tag ) \
 \
 decltype( name ) get_##name( ) const { \
 	return this->name; \
@@ -464,7 +481,7 @@ void set_##name( decltype( name ) value ) { \
 }
 
 #define SMPP_DEFINE_CLASS_ENTRY_BASE_MESSAGE( a, flag, base_type, type, name, tag ) \
-bool has_##name( ) const { return this->__INTERNAL_tags.is_set( tag ); } \
+SMPP_DEFINE_CLASS_ENTRY_SHARED( a, flag, base_type, type, name, tag ) \
 \
 const type& get_##name( ) const { \
 	if ( !this->__INTERNAL_tags.is_set( tag ) ) return { }; \
@@ -477,7 +494,7 @@ void set_##name( const type& value) { \
 }
 
 #define SMPP_DEFINE_CLASS_ENTRY_BASE_MESSAGE_DATA( a, flag, base_type, type, name, tag ) \
-bool has_##name( ) const { return this->__INTERNAL_tags.is_set( tag ); } \
+SMPP_DEFINE_CLASS_ENTRY_SHARED( a, flag, base_type, type, name, tag ) \
 \
 bool get_##name( type& out ) const { \
 	if ( !this->__INTERNAL_tags.is_set( tag ) ) return false; \
@@ -491,7 +508,7 @@ void set_##name( const uint8_t* buffer, size_t buffer_size ) { \
 } \
 
 #define SMPP_DEFINE_CLASS_ENTRY_DATA_BASE( a, flag, base_type, type, name, tag ) \
-bool has_##name( ) const { return this->__INTERNAL_tags.is_set( tag ); } \
+SMPP_DEFINE_CLASS_ENTRY_SHARED( a, flag, base_type, type, name, tag ) \
 \
 const decltype( name )& get_##name( ) const { \
 	return this->name; \
