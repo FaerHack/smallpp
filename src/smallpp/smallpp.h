@@ -15,118 +15,6 @@
 namespace smallpp {
 
 	// 
-	// Tiny class so we can read easier
-	// 
-
-	struct bf_reader {
-	private:
-		const uint8_t* m_buffer;
-		const uint8_t* m_end;
-
-	public:
-		bf_reader( const uint8_t* buffer, size_t buffer_size ) {
-			m_buffer = buffer;
-			m_end = buffer + buffer_size;
-		}
-
-		template < typename T >
-		bool read( T& value ) {
-			constexpr auto size = sizeof( value );
-			if ( ( m_buffer + size ) > m_end ) return false;
-
-			value = *( T* )m_buffer;
-
-			m_buffer += size;
-			return true;
-		}
-
-		bool skip( size_t size ) {
-			if ( ( m_buffer + size ) > m_end )
-				return false;
-
-			m_buffer += size;
-			return true;
-		}
-
-		const uint8_t* get_buffer( ) const {
-			return m_buffer;
-		}
-	};
-
-	// 
-	// Tiny class so we can write easier
-	// 
-
-	struct bf_writer {
-	private:
-		uint8_t* m_buffer;
-		const uint8_t* m_end;
-
-	public:
-		bf_writer( uint8_t* buffer, size_t buffer_size ) {
-			m_buffer = buffer;
-			m_end = buffer + buffer_size;
-		}
-
-		template < typename T >
-		bool write( T& value ) {
-			constexpr auto size = sizeof( value );
-			if ( ( m_buffer + size ) >= m_end ) return false;
-
-			*( T* )m_buffer = value;
-
-			m_buffer += size;
-			return true;
-		}
-	};
-
-	// 
-	// Tiny helper func to calculate VarInt size on compile-time
-	// 
-
-	template <uint32_t _value>
-	struct varint_size_s {
-		static const size_t value = ( _value < ( 1 << 7 ) ) ? 1
-			: ( _value < ( 1 << 14 ) ) ? 2
-			: ( _value < ( 1 << 21 ) ) ? 3
-			: ( _value < ( 1 << 28 ) ) ? 4
-			: 5;
-	};
-
-	// 
-	// Tiny class to simplify working with bits
-	// 
-
-	constexpr auto BITS_PER_INT = 32;
-	constexpr auto BITSET_INT( int bitNum ) { return ( ( bitNum ) >> 5/*log2(32)*/ ); }
-
-	template<size_t num_bits, size_t num_data = ( num_bits + ( BITS_PER_INT - 1 ) ) / BITS_PER_INT>
-	struct bit_set {
-	public:
-		uint32_t m_data[ num_data ];
-
-		bit_set( ) {
-			clear( );
-		}
-
-		inline bool is_set( int n ) const {
-			return ( ( m_data[ BITSET_INT( n ) ] & ( 1U << ( n % BITS_PER_INT ) ) ) != 0 );
-		}
-
-		inline void set( int n, bool v ) {
-			if ( v )
-				m_data[ BITSET_INT( n ) ] |= ( 1U << ( n % BITS_PER_INT ) );
-			else
-				m_data[ BITSET_INT( n ) ] &= ~( 1U << ( n % BITS_PER_INT ) );
-		}
-
-		inline void clear( ) {
-			for ( auto i = 0; i < num_data; i++ )
-				m_data[ i ] = 0;
-		}
-	};
-
-	// 
 	// Small structs to hold certain data
 	// 
 
@@ -141,22 +29,152 @@ namespace smallpp {
 	};
 
 	// 
-	// 
-	// 
-
-	enum class e_wire_type : uint64_t {
-		varint = 0,
-		fixed64 = 1,
-		length_delimited = 2,
-		fixed32 = 5,
-	};
-
-	// 
 	// Base message with base types and few virtual functions
 	// 
 
 	class base_message {
 	protected:
+
+		// 
+		// Tiny class so we can read easier
+		// 
+
+		struct bf_reader {
+		private:
+			const uint8_t* m_buffer;
+			const uint8_t* m_end;
+
+		public:
+			bf_reader( const uint8_t* buffer, size_t buffer_size ) {
+				m_buffer = buffer;
+				m_end = buffer + buffer_size;
+			}
+
+			template < typename T >
+			bool read( T& value ) {
+				constexpr auto size = sizeof( value );
+				if ( ( m_buffer + size ) > m_end ) return false;
+
+				value = *( T* )m_buffer;
+
+				m_buffer += size;
+				return true;
+			}
+
+			bool read_varint( uint64_t& value ) {
+				bool keep_going = false;
+				int shift = 0;
+
+				value = 0;
+				do {
+					uint8_t next_number = 0;
+					if ( !read( next_number ) )
+						return false;
+
+					keep_going = ( next_number >= 128 );
+					value += ( uint64_t )( next_number & 0x7f ) << shift;
+					shift += 7;
+				} while ( keep_going );
+
+				return true;
+			}
+
+			bool skip( size_t size ) {
+				if ( ( m_buffer + size ) > m_end )
+					return false;
+
+				m_buffer += size;
+				return true;
+			}
+
+			const uint8_t* get_buffer( ) const {
+				return m_buffer;
+			}
+		};
+
+		// 
+		// Tiny class so we can write easier
+		// 
+
+		struct bf_writer {
+		private:
+			uint8_t* m_buffer;
+			const uint8_t* m_end;
+
+		public:
+			bf_writer( uint8_t* buffer, size_t buffer_size ) {
+				m_buffer = buffer;
+				m_end = buffer + buffer_size;
+			}
+
+			template < typename T >
+			bool write( T& value ) {
+				constexpr auto size = sizeof( value );
+				if ( ( m_buffer + size ) >= m_end ) return false;
+
+				*( T* )m_buffer = value;
+
+				m_buffer += size;
+				return true;
+			}
+		};
+
+		// 
+		// Tiny helper func to calculate VarInt size on compile-time
+		// 
+
+		template <uint32_t _value>
+		struct varint_size_s {
+			static const size_t value = ( _value < ( 1 << 7 ) ) ? 1
+				: ( _value < ( 1 << 14 ) ) ? 2
+				: ( _value < ( 1 << 21 ) ) ? 3
+				: ( _value < ( 1 << 28 ) ) ? 4
+				: 5;
+		};
+
+		// 
+		// Tiny class to simplify working with bits
+		// 
+
+		static constexpr auto BITS_PER_INT = 32;
+		static constexpr auto BITSET_INT( int n ) { return ( ( n ) >> 5/*log2(32)*/ ); }
+
+		template<size_t num_bits, size_t num_data = ( num_bits + ( BITS_PER_INT - 1 ) ) / BITS_PER_INT>
+		struct bit_set {
+		public:
+			uint32_t m_data[ num_data ];
+
+			bit_set( ) {
+				clear( );
+			}
+
+			inline bool is_set( int n ) const {
+				return ( ( m_data[ BITSET_INT( n ) ] & ( 1U << ( n % BITS_PER_INT ) ) ) != 0 );
+			}
+
+			inline void set( int n, bool v ) {
+				if ( v )
+					m_data[ BITSET_INT( n ) ] |= ( 1U << ( n % BITS_PER_INT ) );
+				else
+					m_data[ BITSET_INT( n ) ] &= ~( 1U << ( n % BITS_PER_INT ) );
+			}
+
+			inline void clear( ) {
+				for ( auto i = 0; i < num_data; i++ )
+					m_data[ i ] = 0;
+			}
+		};
+
+		// 
+		// 
+		// 
+
+		enum class e_wire_type : uint64_t {
+			varint = 0,
+			fixed64 = 1,
+			length_delimited = 2,
+			fixed32 = 5,
+		};
 
 		struct field_header_s {
 			e_wire_type type : 3;
@@ -165,29 +183,11 @@ namespace smallpp {
 
 		bool read_field( bf_reader& bf, field_header_s& field ) {
 			uint64_t value = 0;
-			if ( !read_varint( bf, value ) )
+			if ( !bf.read_varint( value ) )
 				return false;
 			
 			// TODO: seems weird. probably wont work on some compilers in some cases?
 			field = *( field_header_s* )&value;
-			return true;
-		}
-
-		bool read_varint( bf_reader& bf, uint64_t& value ) {
-			bool keep_going = false;
-			int shift = 0;
-
-			value = 0;
-			do {
-				uint8_t next_number = 0;
-				if ( !bf.read( next_number ) )
-					return false;
-
-				keep_going = ( next_number >= 128 );
-				value += ( uint64_t )( next_number & 0x7f ) << shift;
-				shift += 7;
-			} while ( keep_going );
-
 			return true;
 		}
 
@@ -240,12 +240,12 @@ namespace smallpp {
 #define SMPP_DATA_TYPE_STRING smallpp::string_s
 #define SMPP_DATA_TYPE_BYTES smallpp::data_s
 
-#define SMPP_WIRE_TYPE_VARINT smallpp::e_wire_type::varint
-#define SMPP_WIRE_TYPE_FIXED32 smallpp::e_wire_type::fixed32
-#define SMPP_WIRE_TYPE_FIXED64 smallpp::e_wire_type::fixed64
-#define SMPP_WIRE_TYPE_DATA smallpp::e_wire_type::length_delimited
-#define SMPP_WIRE_TYPE_MESSAGE smallpp::e_wire_type::length_delimited
-#define SMPP_WIRE_TYPE_ENUM smallpp::e_wire_type::varint
+#define SMPP_WIRE_TYPE_VARINT e_wire_type::varint
+#define SMPP_WIRE_TYPE_FIXED32 e_wire_type::fixed32
+#define SMPP_WIRE_TYPE_FIXED64 e_wire_type::fixed64
+#define SMPP_WIRE_TYPE_DATA e_wire_type::length_delimited
+#define SMPP_WIRE_TYPE_MESSAGE e_wire_type::length_delimited
+#define SMPP_WIRE_TYPE_ENUM e_wire_type::varint
 
 #define SMPP_BASE_TYPE_VARINT( name ) SMPP_TYPE_##name
 #define SMPP_BASE_TYPE_FIXED32( name ) SMPP_TYPE_##name
@@ -263,16 +263,14 @@ namespace smallpp {
 #define SMPP_DEFAULT_VALUE_MESSAGE_DATA( ... ) { nullptr, 0 }
 #define SMPP_DEFAULT_VALUE_ENUM( name ) ( name )0
 
-#define SMPP_GET
-
 #define SMPP_GET_TYPE( base_type, type ) SMPP_BASE_TYPE_##base_type( type )
 
 #define SMPP_DEFINE_MEMBER_ENTRY( a, flag, base_type, type, name, tag ) SMPP_GET_TYPE( base_type, type ) name;
 #define SMPP_DEFINE_CLEAR_ENTRY( a, flag, base_type, type, name, tag ) name = SMPP_DEFAULT_VALUE_##base_type( type );
 
-#define SMPP_DEFINE_READ_BASE( a, base_type, type, name, function ) \
+#define SMPP_DEFINE_READ_VARINT( a, base_type, type, name ) \
 uint64_t value = 0; \
-if ( !( function( bf, value ) ) ) \
+if ( !( bf.read_varint( value ) ) ) \
 	return false; \
 \
 this->name = ( SMPP_GET_TYPE( base_type, type ) )value;
@@ -281,14 +279,14 @@ this->name = ( SMPP_GET_TYPE( base_type, type ) )value;
 if ( !( bf.read( this->name ) ) ) \
 	return false;
  
-#define SMPP_DEFINE_READ_TYPE_VARINT( a, flag, base_type, type, name, tag ) SMPP_DEFINE_READ_BASE( a, base_type, type, name, this->read_varint )
+#define SMPP_DEFINE_READ_TYPE_VARINT( a, flag, base_type, type, name, tag ) SMPP_DEFINE_READ_VARINT( a, base_type, type, name )
 #define SMPP_DEFINE_READ_TYPE_FIXED32( a, flag, base_type, type, name, tag ) SMPP_DEFINE_READ_TYPE( a, name )
 #define SMPP_DEFINE_READ_TYPE_FIXED64( a, flag, base_type, type, name, tag ) SMPP_DEFINE_READ_TYPE( a, name )
-#define SMPP_DEFINE_READ_TYPE_ENUM( a, flag, base_type, type, name, tag ) SMPP_DEFINE_READ_BASE( a, base_type, type, name, this->read_varint )
+#define SMPP_DEFINE_READ_TYPE_ENUM( a, flag, base_type, type, name, tag ) SMPP_DEFINE_READ_VARINT( a, base_type, type, name )
 
 #define SMPP_DEFINE_READ_TYPE_MESSAGE( a, flag, base_type, type, name, tag ) \
 uint64_t size = 0; \
-if ( !read_varint( bf, size ) ) \
+if ( !bf.read_varint( size ) ) \
 	return false; \
 \
 auto buff = bf.get_buffer( ); \
@@ -300,7 +298,7 @@ if ( !name.parse_from_buffer( buff, size ) ) \
 
 #define SMPP_DEFINE_READ_TYPE_MESSAGE_DATA( a, flag, base_type, type, name, tag ) \
 uint64_t size = 0; \
-if ( !read_varint( bf, size ) ) \
+if ( !bf.read_varint( size ) ) \
 	return false; \
 \
 this->name.buffer = bf.get_buffer( ); \
@@ -310,7 +308,7 @@ if ( !bf.skip( size ) ) \
 
 #define SMPP_DEFINE_READ_TYPE_DATA_STRING( a, flag, base_type, type, name, tag ) \
 uint64_t size = 0; \
-if ( !this->read_varint( bf, size ) ) \
+if ( !bf.read_varint( size ) ) \
 	return false; \
 \
 this->name.buffer = ( const char* )bf.get_buffer( ); \
@@ -320,7 +318,7 @@ if ( !bf.skip( size ) ) \
 
 #define SMPP_DEFINE_READ_TYPE_DATA_BYTES( a, flag, base_type, type, name, tag ) \
 uint64_t size = 0; \
-if ( !this->read_varint( bf, size ) ) \
+if ( !bf.read_varint( size ) ) \
 	return false; \
 \
 this->name.buffer = bf.get_buffer( ); \
@@ -363,7 +361,7 @@ if ( !this->__INTERNAL_tags.is_set( tag ) ) return false;
 // 
 // =====================================
 
-#define SMPP_FIELD_HDR_SIZE( tag ) smallpp::varint_size_s< tag << 3 >::value
+#define SMPP_FIELD_HDR_SIZE( tag ) varint_size_s< tag << 3 >::value
 
 #define SMPP_DEFINE_BYTES_SIZE_ENTRY_VARINT( a, flag, base_type, type, name, tag ) this->sizeof_varint( this->name )
 #define SMPP_DEFINE_BYTES_SIZE_ENTRY_FIXED32( a, flag, base_type, type, name, tag ) 4
@@ -468,7 +466,7 @@ void set_##name( decltype( name ) value ) { \
 #define SMPP_BIND( name, max_tag ) \
 struct name : public smallpp::base_message { \
 private: \
-	smallpp::bit_set<max_tag> __INTERNAL_tags; \
+	bit_set<max_tag> __INTERNAL_tags; \
 	SMPP_FIELDS_##name( SMPP_DEFINE_MEMBER_ENTRY, 0 ) \
 \
 public: \
@@ -481,7 +479,7 @@ public: \
 	} \
 \
 	bool parse_from_buffer( const uint8_t* buffer, size_t buffer_size ) override { \
-		auto bf = smallpp::bf_reader( buffer, buffer_size ); \
+		auto bf = bf_reader( buffer, buffer_size ); \
 \
 		this->__INTERNAL_tags.clear( ); \
 \
@@ -492,27 +490,27 @@ public: \
 				default: \
 				{\
 					switch ( field.type ) { \
-						case smallpp::e_wire_type::varint: \
+						case e_wire_type::varint: \
 						{ \
 							uint64_t dummy = 0; \
-							if ( !this->read_varint( bf, dummy ) ) \
+							if ( !bf.read_varint( dummy ) ) \
 								return false; \
 							break; \
 						} \
-						case smallpp::e_wire_type::fixed64: \
+						case e_wire_type::fixed64: \
 						{ \
 							bf.skip( 8 ); \
 							break; \
 						} \
-						case smallpp::e_wire_type::fixed32: \
+						case e_wire_type::fixed32: \
 						{ \
 							bf.skip( 4 ); \
 							break; \
 						} \
-						case smallpp::e_wire_type::length_delimited: \
+						case e_wire_type::length_delimited: \
 						{ \
 							uint64_t length = 0; \
-							if ( !this->read_varint( bf, length ) ) \
+							if ( !bf.read_varint( length ) ) \
 								return false; \
 							bf.skip( length ); \
 							break; \
@@ -530,7 +528,7 @@ public: \
 	} \
 \
 	bool write_to_buffer( uint8_t* buffer, size_t buffer_size ) override { \
-		auto bf = smallpp::bf_writer( buffer, buffer_size ); \
+		auto bf = bf_writer( buffer, buffer_size ); \
 		SMPP_FIELDS_##name( SMPP_DEFINE_WRITE_ENTRY, 0 ) \
 		return true; \
 	} \

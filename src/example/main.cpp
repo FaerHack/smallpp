@@ -8,9 +8,9 @@
 #include "generated.h"
 
 int main( ) {
-	//test_message msg;
-	//auto result = msg.parse_from_buffer( resources::test_message, sizeof( resources::test_message ) );
-	//const auto& location = msg.get_location( );
+	//test_message _msg;
+	//auto result = _msg.parse_from_buffer( resources::test_message, sizeof( resources::test_message ) );
+	//const auto& _location = _msg.get_location( );
 
 	test_message msg;
 	const auto size1 = msg.bytes_size( );
