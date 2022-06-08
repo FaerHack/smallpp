@@ -2,7 +2,7 @@
 #include <smallpp.h>
 
 #define SMPP_FIELDS_CMsgSOIDOwner( X, a ) \
-X( a, OPTIONAL, VARINT, UINT32, type, 1 )// \
+X( a, OPTIONAL, VARINT, UINT32, type, 1 ) \
 X( a, OPTIONAL, VARINT, UINT64, id, 2 )
 
 SMPP_BIND( CMsgSOIDOwner, 2 );

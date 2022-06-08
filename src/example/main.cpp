@@ -8,9 +8,12 @@
 #include "generated.h"
 
 int main( ) {
+	//test_message msg;
+	//auto result = msg.parse_from_buffer( resources::test_message, sizeof( resources::test_message ) );
+	//const auto& location = msg.get_location( );
+
 	test_message msg;
-	auto result = msg.parse_from_buffer( resources::test_message, sizeof( resources::test_message ) );
-	auto location = msg.get_location( );
-	
+	auto size1 = msg.get_size( );
+
 	return 0;
 }

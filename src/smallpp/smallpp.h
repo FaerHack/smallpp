@@ -1,6 +1,11 @@
 #pragma once
-
 #include <stdint.h>
+
+// TODO:
+// - Add writing
+// - Add get_size
+// - Support repeated
+// - Add more comments and spacing between code sections
 
 namespace smallpp {
 
@@ -125,8 +130,6 @@ namespace smallpp {
 		varint = 0,
 		fixed64 = 1,
 		length_delimited = 2,
-		group_start = 3,
-		group_end = 4,
 		fixed32 = 5,
 	};
 
@@ -173,7 +176,7 @@ namespace smallpp {
 	public:
 		virtual bool parse_from_buffer( const uint8_t* buffer, size_t buffer_size ) = 0;
 		virtual bool write_to_buffer( uint8_t* buffer, size_t buffer_size ) = 0;
-		virtual size_t get_size( ) = 0;
+		virtual size_t bytes_size( ) = 0;
 		virtual void clear( ) = 0;
 	};
 
@@ -322,10 +325,10 @@ const type& get_##name( ) const { \
 	return this->name; \
 } \
 \
-//void set_##name( const type& value) { \
-//	this->__INTERNAL_tags.set( tag, true ); \
-//	this->name = value; \
-//}
+void set_##name( const type& value) { \
+	this->__INTERNAL_tags.set( tag, true ); \
+	this->name = value; \
+}
 
 #define SMPP_DEFINE_CLASS_ENTRY_BASE_MESSAGE_DATA( a, flag, base_type, type, name, tag ) \
 bool has_##name( ) const { return this->__INTERNAL_tags.is_set( tag ); } \
@@ -365,8 +368,7 @@ void set_##name( decltype( name ) value ) { \
 #define SMPP_DEFINE_CLASS_ENTRY_OPTIONAL( a, flag, base_type, type, name, tag ) SMPP_DEFINE_CLASS_ENTRY_BASE_##base_type( a, flag, base_type, type, name, tag )
 #define SMPP_DEFINE_CLASS_ENTRY_REQUIRED( a, flag, base_type, type, name, tag ) SMPP_DEFINE_CLASS_ENTRY_BASE_##base_type( a, flag, base_type, type, name, tag )
 
-#define SMPP_DEFINE_CLASS_ENTRY_REPEATED( a, flag, base_type, type, name, tag ) \
-// TODO
+#define SMPP_DEFINE_CLASS_ENTRY_REPEATED( a, flag, base_type, type, name, tag ) NOT_IMPLEMENTED_YET
 
 #define SMPP_DEFINE_CLASS_ENTRY( a, flag, base_type, type, name, tag ) \
 SMPP_DEFINE_CLASS_ENTRY_##flag( a, flag, base_type, type, name, tag )
@@ -444,8 +446,10 @@ public: \
 		return true; \
 	} \
 \
-	size_t get_size( ) override { \
-		return 0; \
+	size_t bytes_size( ) override { \
+		size_t result = 0; \
+\
+		return result; \
 	} \
 \
 	void clear( ) override { \
