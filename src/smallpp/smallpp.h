@@ -1,36 +1,58 @@
 #pragma once
 #include <stdint.h>
 
-// for _alloca
-#include <malloc.h>
+// TODO: Describe what it does
+#ifdef SMPP_ENABLE_STRINGS
+#include <string>
+#endif
 
-// for memcpy
+// TODO: Describe what it does
+#ifndef SMPP_MEMCPY
 #include <string.h>
+#define SMPP_MEMCPY( dst, src, size ) memcpy( dst, src, size )
+#endif
+
+// TODO: Describe what it does
+#ifndef SMPP_STRLEN
+#include <string.h>
+#define SMPP_STRLEN( str ) strlen( str )
+#endif
+
+// TODO: Describe what it does
+#ifndef SMPP_ALLOC
+#include <malloc.h>
+#define SMPP_ALLOC( size ) _alloca( size )
+#endif
+
+// Added just in case
+#ifndef SMPP_FREE
+#define SMPP_FREE( ... )
+#endif
 
 // TODO:
 // - Support repeated
 // - Add more comments and spacing between code sections
-// - Custom setter for string and bytes (remember to write before including string.h about using strlen)
-// - MESSAGE_DATA setter with message
-// - Copy constructor for string_s & data_s
-// - Maybe merge strings and data_s?
 // - Maybe instead of true/false return error code? so we can differentiate between out_of_memory and required_field_not_set for example
-// - Maybe add overloads for strlen/memcpy/alloca as defines? SMPP_STRLEN / SMPP_MEMCPY / SMPP_ALLOC etc
 
 namespace smallpp {
 
 	// 
-	// Small structs to hold certain data
+	// Small struct to hold any data
 	// 
-
-	struct string_s {
-		const char* buffer;
-		size_t length;
-	};
 
 	struct data_s {
 		const uint8_t* buffer;
 		size_t size;
+
+		data_s( ) {
+			buffer = nullptr;
+			size = 0;
+		}
+
+		data_s( const data_s& other ) {
+			this->buffer = other.buffer;
+			this->size = other.size;
+		}
 	};
 
 	// 
@@ -118,7 +140,7 @@ namespace smallpp {
 				if ( ( m_buffer + size ) > m_end )
 					return false;
 
-				memcpy( m_buffer, &value, size );
+				SMPP_MEMCPY( m_buffer, &value, size );
 
 				m_buffer += size;
 				return true;
@@ -128,7 +150,7 @@ namespace smallpp {
 				if ( ( m_buffer + size ) > m_end )
 					return false;
 
-				memcpy( m_buffer, buffer, size );
+				SMPP_MEMCPY( m_buffer, buffer, size );
 
 				m_buffer += size;
 				return true;
@@ -265,6 +287,10 @@ namespace smallpp {
 
 }
 
+// 
+// Types
+// 
+
 #define SMPP_TYPE_INT32 int32_t
 #define SMPP_TYPE_INT64 int64_t
 #define SMPP_TYPE_UINT32 uint32_t
@@ -272,9 +298,6 @@ namespace smallpp {
 #define SMPP_TYPE_BOOL bool
 #define SMPP_TYPE_FLOAT float
 #define SMPP_TYPE_DOUBLE double
-
-#define SMPP_DATA_TYPE_STRING smallpp::string_s
-#define SMPP_DATA_TYPE_BYTES smallpp::data_s
 
 #define SMPP_WIRE_TYPE_VARINT e_wire_type::varint
 #define SMPP_WIRE_TYPE_FIXED32 e_wire_type::fixed32
@@ -286,23 +309,36 @@ namespace smallpp {
 #define SMPP_BASE_TYPE_VARINT( name ) SMPP_TYPE_##name
 #define SMPP_BASE_TYPE_FIXED32( name ) SMPP_TYPE_##name
 #define SMPP_BASE_TYPE_FIXED64( name ) SMPP_TYPE_##name
-#define SMPP_BASE_TYPE_DATA( name ) SMPP_DATA_TYPE_##name
+#define SMPP_BASE_TYPE_DATA( name ) smallpp::data_s
 #define SMPP_BASE_TYPE_MESSAGE( name ) name
 #define SMPP_BASE_TYPE_MESSAGE_DATA( ... ) smallpp::data_s
 #define SMPP_BASE_TYPE_ENUM( name ) name
 
+#define SMPP_GET_TYPE( base_type, type ) SMPP_BASE_TYPE_##base_type( type )
+
+// 
+// Default values
+// 
+
 #define SMPP_DEFAULT_VALUE_VARINT( ... ) 0
 #define SMPP_DEFAULT_VALUE_FIXED32( ... ) 0
 #define SMPP_DEFAULT_VALUE_FIXED64( ... ) 0
-#define SMPP_DEFAULT_VALUE_DATA( ... ) { nullptr, 0 }
+#define SMPP_DEFAULT_VALUE_DATA( ... ) { }
 #define SMPP_DEFAULT_VALUE_MESSAGE( ... ) { }
-#define SMPP_DEFAULT_VALUE_MESSAGE_DATA( ... ) { nullptr, 0 }
+#define SMPP_DEFAULT_VALUE_MESSAGE_DATA( ... ) { }
 #define SMPP_DEFAULT_VALUE_ENUM( name ) ( name )0
 
-#define SMPP_GET_TYPE( base_type, type ) SMPP_BASE_TYPE_##base_type( type )
+// 
+// Member / copy / clear entries
+// 
 
 #define SMPP_DEFINE_MEMBER_ENTRY( a, flag, base_type, type, name, tag ) SMPP_GET_TYPE( base_type, type ) name;
+#define SMPP_DEFINE_COPY_ENTRY( a, flag, base_type, type, name, tag ) this->name = other.name;
 #define SMPP_DEFINE_CLEAR_ENTRY( a, flag, base_type, type, name, tag ) name = SMPP_DEFAULT_VALUE_##base_type( type );
+
+// 
+// Reading
+// 
 
 #define SMPP_DEFINE_READ_VARINT( a, base_type, type, name ) \
 uint64_t value = 0; \
@@ -342,17 +378,7 @@ this->name.size = size; \
 if ( !bf.skip( size ) ) \
 	return false;
 
-#define SMPP_DEFINE_READ_TYPE_DATA_STRING( a, flag, base_type, type, name, tag ) \
-uint64_t size = 0; \
-if ( !bf.read_varint( size ) ) \
-	return false; \
-\
-this->name.buffer = ( const char* )bf.get_buffer( ); \
-this->name.length = size; \
-if ( !bf.skip( size ) ) \
-	return false;
-
-#define SMPP_DEFINE_READ_TYPE_DATA_BYTES( a, flag, base_type, type, name, tag ) \
+#define SMPP_DEFINE_READ_TYPE_DATA( a, flag, base_type, type, name, tag ) \
 uint64_t size = 0; \
 if ( !bf.read_varint( size ) ) \
 	return false; \
@@ -361,8 +387,6 @@ this->name.buffer = bf.get_buffer( ); \
 this->name.size = size; \
 if ( !bf.skip( size ) ) \
 	return false;
-
-#define SMPP_DEFINE_READ_TYPE_DATA( a, flag, base_type, type, name, tag ) SMPP_DEFINE_READ_TYPE_DATA_##type( a, flag, base_type, type, name, tag )
 
 #define SMPP_DEFINE_READ_ENTRY( a, flag, base_type, type_, name, tag ) \
 case tag: \
@@ -373,6 +397,9 @@ case tag: \
 	break; \
 }
 
+// 
+// Post-read (for example to make sure required fields are set)
+// 
 
 #define SMPP_DEFINE_POST_READ_ENTRY_REQUIRED( a, flag, base_type, type, name, tag ) \
 if ( !this->__INTERNAL_tags.is_set( tag ) ) return false;
@@ -382,21 +409,13 @@ if ( !this->__INTERNAL_tags.is_set( tag ) ) return false;
 
 #define SMPP_DEFINE_POST_READ_ENTRY( a, flag, base_type, type, name, tag ) SMPP_DEFINE_POST_READ_ENTRY_##flag( a, flag, base_type, type, name, tag )
 
-// =====================================
 // 
+// Writing
 // 
-// 
-// =====================================
 
-#define SMPP_DEFINE_WRITE_ENTRY_DATA_BYTES( a, flag, base_type, type, name, tag ) \
+#define SMPP_DEFINE_WRITE_ENTRY_DATA( a, flag, base_type, type, name, tag ) \
 if ( !bf.write_varint( this->name.size ) || !bf.write_data( this->name.buffer, this->name.size ) ) \
 	return false;
-
-#define SMPP_DEFINE_WRITE_ENTRY_DATA_STRING( a, flag, base_type, type, name, tag ) \
-if ( !bf.write_varint( this->name.length ) || !bf.write_data( ( const uint8_t* )this->name.buffer, this->name.length ) ) \
-	return false;
-
-#define SMPP_DEFINE_WRITE_ENTRY_DATA( a, flag, base_type, type, name, tag ) SMPP_DEFINE_WRITE_ENTRY_DATA_##type( a, flag, base_type, type, name, tag )
 
 #define SMPP_DEFINE_WRITE_ENTRY_VARINT( a, flag, base_type, type, name, tag ) if ( !bf.write_varint( this->name ) ) return false;
 #define SMPP_DEFINE_WRITE_ENTRY_FIXED32( a, flag, base_type, type, name, tag ) if ( !bf.write( this->name ) ) return false;
@@ -405,11 +424,18 @@ if ( !bf.write_varint( this->name.length ) || !bf.write_data( ( const uint8_t* )
 
 #define SMPP_DEFINE_WRITE_ENTRY_MESSAGE( a, flag, base_type, type, name, tag ) \
 const auto size = this->name.bytes_size( ); \
-const auto buffer = ( uint8_t* )_alloca( size ); \
-if ( !this->name.write_to_buffer( buffer, size ) ) \
+const auto buffer = ( uint8_t* )SMPP_ALLOC( size ); \
+if ( buffer == nullptr ) \
 	return false; \
-if ( !bf.write_varint( size ) || !bf.write_data( buffer, size ) ) \
-	return false;
+if ( !this->name.write_to_buffer( buffer, size ) ) { \
+	SMPP_FREE( buffer ); \
+	return false; \
+} \
+if ( !bf.write_varint( size ) || !bf.write_data( buffer, size ) ) { \
+	SMPP_FREE( buffer ); \
+	return false; \
+} \
+SMPP_FREE( buffer );
 
 #define SMPP_DEFINE_WRITE_ENTRY_MESSAGE_DATA( a, flag, base_type, type, name, tag ) \
 if ( !bf.write_varint( this->name.size ) || !bf.write_data( this->name.buffer, this->name.size ) ) \
@@ -436,11 +462,9 @@ NOT_IMPLEMENTED_YET
 
 #define SMPP_DEFINE_WRITE_ENTRY( a, flag, base_type, type, name, tag ) SMPP_DEFINE_WRITE_ENTRY_##flag( a, flag, base_type, type, name, tag )
 
-// =====================================
 // 
+// bytes_size entries
 // 
-// 
-// =====================================
 
 #define SMPP_FIELD_HDR_SIZE( tag ) varint_size_s< tag << 3 >::value
 
@@ -448,21 +472,16 @@ NOT_IMPLEMENTED_YET
 #define SMPP_DEFINE_BYTES_SIZE_ENTRY_FIXED32( a, flag, base_type, type, name, tag ) 4
 #define SMPP_DEFINE_BYTES_SIZE_ENTRY_FIXED64( a, flag, base_type, type, name, tag ) 8
 #define SMPP_DEFINE_BYTES_SIZE_ENTRY_ENUM( a, flag, base_type, type, name, tag ) SMPP_DEFINE_BYTES_SIZE_ENTRY_VARINT( a, flag, base_type, type, name, tag )
-#define SMPP_DEFINE_BYTES_SIZE_ENTRY_MESSAGE( a, flag, base_type, type, name, tag ) this->sizeof_varint( this->name.bytes_size( ) ) + this->name.bytes_size( ) // GET RID OF DOUBLE bytes_size CALL!!!!
+#define SMPP_DEFINE_BYTES_SIZE_ENTRY_MESSAGE( a, flag, base_type, type, name, tag ) this->sizeof_varint( this->name.bytes_size( ) ) + this->name.bytes_size( ) // TODO: GET RID OF DOUBLE bytes_size CALL!!!!
 #define SMPP_DEFINE_BYTES_SIZE_ENTRY_MESSAGE_DATA( a, flag, base_type, type, name, tag ) this->sizeof_varint( this->name.size ) + this->name.size
-
-#define SMPP_DEFINE_BYTES_SIZE_ENTRY_DATA_BYTES( a, flag, base_type, type, name, tag ) this->sizeof_varint( this->name.size ) + this->name.size
-#define SMPP_DEFINE_BYTES_SIZE_ENTRY_DATA_STRING( a, flag, base_type, type, name, tag ) this->sizeof_varint( this->name.length ) + this->name.length
-#define SMPP_DEFINE_BYTES_SIZE_ENTRY_DATA( a, flag, base_type, type, name, tag ) SMPP_DEFINE_BYTES_SIZE_ENTRY_DATA_##type( a, flag, base_type, type, name, tag )
+#define SMPP_DEFINE_BYTES_SIZE_ENTRY_DATA( a, flag, base_type, type, name, tag ) this->sizeof_varint( this->name.size ) + this->name.size
 
 #define SMPP_DEFINE_BYTES_SIZE_ENTRY( a, flag, base_type, type, name, tag ) \
 if ( this->__INTERNAL_tags.is_set( tag ) ) result += SMPP_FIELD_HDR_SIZE( tag ) + ( SMPP_DEFINE_BYTES_SIZE_ENTRY_##base_type( a, flag, base_type, type, name, tag ) );
 
-// =====================================
 // 
+// Class entries (functions like set_*/get_*/clear_* and etc)
 // 
-// 
-// =====================================
 
 #define SMPP_DEFINE_CLASS_ENTRY_SHARED( a, flag, base_type, type, name, tag ) \
 bool has_##name( ) const { return this->__INTERNAL_tags.is_set( tag ); } \
@@ -505,9 +524,9 @@ void set_##name( const uint8_t* buffer, size_t buffer_size ) { \
 	this->__INTERNAL_tags.set( tag, true ); \
 	this->name.buffer = buffer; \
 	this->name.size = buffer_size; \
-} \
+}
 
-#define SMPP_DEFINE_CLASS_ENTRY_DATA_BASE( a, flag, base_type, type, name, tag ) \
+#define SMPP_DEFINE_CLASS_ENTRY_DATA_BYTES( a, flag, base_type, type, name, tag ) \
 SMPP_DEFINE_CLASS_ENTRY_SHARED( a, flag, base_type, type, name, tag ) \
 \
 const decltype( name )& get_##name( ) const { \
@@ -517,10 +536,40 @@ const decltype( name )& get_##name( ) const { \
 void set_##name( decltype( name ) value ) { \
 	this->__INTERNAL_tags.set( tag, true ); \
 	this->name = value; \
-} \
+}
 
-#define SMPP_DEFINE_CLASS_ENTRY_DATA_BYTES( a, flag, base_type, type, name, tag ) SMPP_DEFINE_CLASS_ENTRY_DATA_BASE( a, flag, base_type, type, name, tag )
-#define SMPP_DEFINE_CLASS_ENTRY_DATA_STRING( a, flag, base_type, type, name, tag ) SMPP_DEFINE_CLASS_ENTRY_DATA_BASE( a, flag, base_type, type, name, tag )
+#ifdef SMPP_ENABLE_STRINGS
+#define SMPP_DEFINE_CLASS_ENTRY_DATA_STRING_IMPLEMENTATION( a, flag, base_type, type, name, tag ) \
+std::string get_##name( ) const { \
+	return std::string( ( const char* )this->name.buffer, this->name.size ); \
+} \
+\
+void set_##name( const std::string& value ) { \
+	this->__INTERNAL_tags.set( tag, true ); \
+	this->name.buffer = ( const uint8_t* )value.data( ); \
+	this->name.size = value.size( ); \
+} \
+void set_##name( const char* buffer, int length = -1 ) { \
+	this->__INTERNAL_tags.set( tag, true ); \
+	this->name.buffer = ( const uint8_t* )buffer; \
+	this->name.size = length != -1 ? length : SMPP_STRLEN( buffer ); \
+}
+#else
+#define SMPP_DEFINE_CLASS_ENTRY_DATA_STRING_IMPLEMENTATION( a, flag, base_type, type, name, tag ) \
+const decltype( name )& get_##name( ) const { \
+	return this->name; \
+} \
+\
+void set_##name( const char* buffer, int length = -1 ) { \
+	this->__INTERNAL_tags.set( tag, true ); \
+	this->name.buffer = ( const uint8_t* )buffer; \
+	this->name.size = length != -1 ? length : SMPP_STRLEN( buffer ); \
+}
+#endif
+
+#define SMPP_DEFINE_CLASS_ENTRY_DATA_STRING( a, flag, base_type, type, name, tag ) \
+SMPP_DEFINE_CLASS_ENTRY_SHARED( a, flag, base_type, type, name, tag ) \
+SMPP_DEFINE_CLASS_ENTRY_DATA_STRING_IMPLEMENTATION( a, flag, base_type, type, name, tag )
 
 #define SMPP_DEFINE_CLASS_ENTRY_BASE_VARINT( a, flag, base_type, type, name, tag ) SMPP_DEFINE_CLASS_ENTRY_BASE( a, flag, base_type, type, name, tag )
 #define SMPP_DEFINE_CLASS_ENTRY_BASE_FIXED32( a, flag, base_type, type, name, tag ) SMPP_DEFINE_CLASS_ENTRY_BASE( a, flag, base_type, type, name, tag )
@@ -534,19 +583,9 @@ void set_##name( decltype( name ) value ) { \
 
 #define SMPP_DEFINE_CLASS_ENTRY( a, flag, base_type, type, name, tag ) SMPP_DEFINE_CLASS_ENTRY_##flag( a, flag, base_type, type, name, tag )
 
-// =====================================
 // 
+// Message struct
 // 
-// 
-// =====================================
-
-#define SMPP_DEFINE_COPY_ENTRY( a, flag, base_type, type, name, tag ) this->name = other.name;
-
-// =====================================
-// 
-// 
-// 
-// =====================================
 
 #define SMPP_BIND( name, max_tag ) \
 struct name : public smallpp::base_message { \
