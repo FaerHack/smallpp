@@ -1,16 +1,24 @@
 #pragma once
 #include <stdint.h>
 
+// for _alloca
+#include <malloc.h>
+
+// for memcpy
+#include <string.h>
+
 // TODO:
 // - Add writing
 // - Add get_size
 // - Support repeated
 // - Add more comments and spacing between code sections
-// - Custom setter for string and bytes
+// - Custom setter for string and bytes (remember to write before including string.h about using strlen)
 // - MESSAGE_DATA setter with message
 // - clear_*
 // - Copy constructor for string_s & data_s
 // - Maybe merge strings and data_s?
+// - Maybe instead of true/false return error code? so we can differentiate between out_of_memory and required_field_not_set for example
+// - Maybe add overloads for strlen/memcpy/alloca as defines? SMPP_STRLEN / SMPP_MEMCPY / SMPP_ALLOC etc
 
 namespace smallpp {
 
@@ -110,11 +118,38 @@ namespace smallpp {
 			template < typename T >
 			bool write( T& value ) {
 				constexpr auto size = sizeof( value );
-				if ( ( m_buffer + size ) >= m_end ) return false;
+				if ( ( m_buffer + size ) > m_end )
+					return false;
 
-				*( T* )m_buffer = value;
+				memcpy( m_buffer, &value, size );
 
 				m_buffer += size;
+				return true;
+			}
+
+			bool write_data( const uint8_t* buffer, size_t size ) {
+				if ( ( m_buffer + size ) > m_end )
+					return false;
+
+				memcpy( m_buffer, buffer, size );
+
+				m_buffer += size;
+				return true;
+			}
+
+			bool write_varint( uint64_t value ) {
+				while ( value >= 128 ) {
+					if ( ( m_buffer + 1 ) > m_end )
+						return false;
+
+					*m_buffer++ = ( value | 0x80 );
+					value >>= 7;
+				}
+
+				if ( ( m_buffer + 1 ) > m_end )
+					return false;
+
+				*m_buffer++ = value;
 				return true;
 			}
 		};
@@ -189,6 +224,10 @@ namespace smallpp {
 			// TODO: seems weird. probably wont work on some compilers in some cases?
 			field = *( field_header_s* )&value;
 			return true;
+		}
+
+		bool write_field( bf_writer& bf, uint64_t tag, e_wire_type type ) {
+			return bf.write_varint( ( tag << 3 ) + ( uint8_t )type );
 		}
 
 		uint32_t highest_bit( uint32_t n ) {
@@ -352,8 +391,39 @@ if ( !this->__INTERNAL_tags.is_set( tag ) ) return false;
 // 
 // =====================================
 
-// TODO
-#define SMPP_DEFINE_WRITE_ENTRY( )
+#define SMPP_DEFINE_WRITE_ENTRY_DATA_BYTES( a, flag, base_type, type, name, tag ) \
+if ( !bf.write_varint( this->name.size ) || !bf.write_data( this->name.buffer, this->name.size ) ) \
+	return false;
+
+#define SMPP_DEFINE_WRITE_ENTRY_DATA_STRING( a, flag, base_type, type, name, tag ) \
+if ( !bf.write_varint( this->name.length ) || !bf.write_data( ( const uint8_t* )this->name.buffer, this->name.length ) ) \
+	return false;
+
+#define SMPP_DEFINE_WRITE_ENTRY_DATA( a, flag, base_type, type, name, tag ) SMPP_DEFINE_WRITE_ENTRY_DATA_##type( a, flag, base_type, type, name, tag )
+
+#define SMPP_DEFINE_WRITE_ENTRY_VARINT( a, flag, base_type, type, name, tag ) if ( !bf.write_varint( this->name ) ) return false;
+#define SMPP_DEFINE_WRITE_ENTRY_FIXED32( a, flag, base_type, type, name, tag ) if ( !bf.write( this->name ) ) return false;
+#define SMPP_DEFINE_WRITE_ENTRY_FIXED64( a, flag, base_type, type, name, tag ) if ( !bf.write( this->name ) ) return false;
+#define SMPP_DEFINE_WRITE_ENTRY_ENUM( a, flag, base_type, type, name, tag ) if ( !bf.write_varint( this->name ) ) return false;
+
+#define SMPP_DEFINE_WRITE_ENTRY_MESSAGE( a, flag, base_type, type, name, tag ) \
+const auto size = this->name.bytes_size( ); \
+const auto buffer = ( uint8_t* )_alloca( size ); \
+if ( !this->name.write_to_buffer( buffer, size ) ) \
+	return false; \
+if ( !bf.write_varint( size ) || !bf.write_data( buffer, size ) ) \
+	return false;
+
+#define SMPP_DEFINE_WRITE_ENTRY_MESSAGE_DATA( a, flag, base_type, type, name, tag ) \
+if ( !bf.write_varint( this->name.size ) || !bf.write_data( this->name.buffer, this->name.size ) ) \
+	return false;
+
+#define SMPP_DEFINE_WRITE_ENTRY( a, flag, base_type, type, name, tag ) \
+if ( this->__INTERNAL_tags.is_set( tag ) ) { \
+	if ( !this->write_field( bf, tag, SMPP_WIRE_TYPE_##base_type ) ) \
+		return false; \
+	SMPP_DEFINE_WRITE_ENTRY_##base_type( a, flag, base_type, type, name, tag ) \
+}
 
 // =====================================
 // 
@@ -375,7 +445,7 @@ if ( !this->__INTERNAL_tags.is_set( tag ) ) return false;
 #define SMPP_DEFINE_BYTES_SIZE_ENTRY_DATA( a, flag, base_type, type, name, tag ) SMPP_DEFINE_BYTES_SIZE_ENTRY_DATA_##type( a, flag, base_type, type, name, tag )
 
 #define SMPP_DEFINE_BYTES_SIZE_ENTRY( a, flag, base_type, type, name, tag ) \
-if ( __INTERNAL_tags.is_set( tag ) ) result += SMPP_FIELD_HDR_SIZE( tag ) + ( SMPP_DEFINE_BYTES_SIZE_ENTRY_##base_type( a, flag, base_type, type, name, tag ) );
+if ( this->__INTERNAL_tags.is_set( tag ) ) result += SMPP_FIELD_HDR_SIZE( tag ) + ( SMPP_DEFINE_BYTES_SIZE_ENTRY_##base_type( a, flag, base_type, type, name, tag ) );
 
 // =====================================
 // 
@@ -488,7 +558,7 @@ public: \
 			switch ( field.number ) { \
 				SMPP_FIELDS_##name( SMPP_DEFINE_READ_ENTRY, 0 ) \
 				default: \
-				{\
+				{ \
 					switch ( field.type ) { \
 						case e_wire_type::varint: \
 						{ \
@@ -518,7 +588,7 @@ public: \
 						default: \
 							return false; \
 					} \
-				}\
+				} \
 			} \
 		} \
 \

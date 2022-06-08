@@ -21,11 +21,15 @@ int main( ) {
 	const auto size2 = msg.bytes_size( );
 
 	test_message_location location;
-	location.set_country( { "UA", 2 } );
+	//location.set_country( { "UA", 2 } );
 	location.set_latitude( 69.420 );
 	location.set_longitude( 42.228 );
 	msg.set_location( location );
 	const auto size3 = msg.bytes_size( );
 
+	auto buffer = new uint8_t[ 300 ];
+	auto result2 = msg.write_to_buffer( buffer, size3 );
+
+	delete[ ] buffer;
 	return 0;
 }
