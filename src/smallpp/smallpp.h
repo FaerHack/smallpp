@@ -31,7 +31,6 @@
 
 // TODO:
 // - Support repeated
-// - Add more comments and spacing between code sections
 // - Maybe instead of true/false return error code? so we can differentiate between out_of_memory and required_field_not_set for example
 
 namespace smallpp {
