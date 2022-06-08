@@ -6,6 +6,11 @@
 // - Add get_size
 // - Support repeated
 // - Add more comments and spacing between code sections
+// - Custom setter for string and bytes
+// - MESSAGE_DATA setter with message
+// - clear_*
+// - Copy constructor for string_s & data_s
+// - Maybe merge strings and data_s?
 
 namespace smallpp {
 
@@ -73,6 +78,19 @@ namespace smallpp {
 			m_buffer += size;
 			return true;
 		}
+	};
+
+	// 
+	// Tiny helper func to calculate VarInt size on compile-time
+	// 
+
+	template <uint32_t _value>
+	struct varint_size_s {
+		static const size_t value = ( _value < ( 1 << 7 ) ) ? 1
+			: ( _value < ( 1 << 14 ) ) ? 2
+			: ( _value < ( 1 << 21 ) ) ? 3
+			: ( _value < ( 1 << 28 ) ) ? 4
+			: 5;
 	};
 
 	// 
@@ -173,6 +191,35 @@ namespace smallpp {
 			return true;
 		}
 
+		uint32_t highest_bit( uint32_t n ) {
+#if defined(__GNUC__)
+			return 63 ^ static_cast< uint32_t >( __builtin_clzll( n ) );
+#elif defined(_MSC_VER) && defined(_M_X64)
+			unsigned long where;
+			_BitScanReverse64( &where, n );
+			return where;
+#else
+			if ( n == 0 )
+				return -1;
+			int log = 0;
+			uint32_t value = n;
+			for ( int i = 4; i >= 0; --i ) {
+				int shift = ( 1 << i );
+				uint32_t x = value >> shift;
+				if ( x != 0 ) {
+					value = x;
+					log += shift;
+				}
+			}
+			return log;
+#endif
+		}
+
+		size_t sizeof_varint( uint64_t value ) {
+			auto n = highest_bit( value | 0x1 );
+			return static_cast< size_t >( ( n * 9 + 73 ) / 64 );
+		}
+
 	public:
 		virtual bool parse_from_buffer( const uint8_t* buffer, size_t buffer_size ) = 0;
 		virtual bool write_to_buffer( uint8_t* buffer, size_t buffer_size ) = 0;
@@ -216,10 +263,12 @@ namespace smallpp {
 #define SMPP_DEFAULT_VALUE_MESSAGE_DATA( ... ) { nullptr, 0 }
 #define SMPP_DEFAULT_VALUE_ENUM( name ) ( name )0
 
+#define SMPP_GET
+
 #define SMPP_GET_TYPE( base_type, type ) SMPP_BASE_TYPE_##base_type( type )
 
 #define SMPP_DEFINE_MEMBER_ENTRY( a, flag, base_type, type, name, tag ) SMPP_GET_TYPE( base_type, type ) name;
-#define SMPP_DEFINE_CONSTRUCTOR_ENTRY( a, flag, base_type, type, name, tag ) name = SMPP_DEFAULT_VALUE_##base_type( type );
+#define SMPP_DEFINE_CLEAR_ENTRY( a, flag, base_type, type, name, tag ) name = SMPP_DEFAULT_VALUE_##base_type( type );
 
 #define SMPP_DEFINE_READ_BASE( a, base_type, type, name, function ) \
 uint64_t value = 0; \
@@ -299,11 +348,42 @@ if ( !this->__INTERNAL_tags.is_set( tag ) ) return false;
 
 #define SMPP_DEFINE_POST_READ_ENTRY( a, flag, base_type, type, name, tag ) SMPP_DEFINE_POST_READ_ENTRY_##flag( a, flag, base_type, type, name, tag )
 
+// =====================================
+// 
+// 
+// 
+// =====================================
 
 // TODO
 #define SMPP_DEFINE_WRITE_ENTRY( )
-#define SMPP_DEFINE_GET_SIZE_ENTRY( )
 
+// =====================================
+// 
+// 
+// 
+// =====================================
+
+#define SMPP_FIELD_HDR_SIZE( tag ) smallpp::varint_size_s< tag << 3 >::value
+
+#define SMPP_DEFINE_BYTES_SIZE_ENTRY_VARINT( a, flag, base_type, type, name, tag ) this->sizeof_varint( this->name )
+#define SMPP_DEFINE_BYTES_SIZE_ENTRY_FIXED32( a, flag, base_type, type, name, tag ) 4
+#define SMPP_DEFINE_BYTES_SIZE_ENTRY_FIXED64( a, flag, base_type, type, name, tag ) 8
+#define SMPP_DEFINE_BYTES_SIZE_ENTRY_ENUM( a, flag, base_type, type, name, tag ) SMPP_DEFINE_BYTES_SIZE_ENTRY_VARINT( a, flag, base_type, type, name, tag )
+#define SMPP_DEFINE_BYTES_SIZE_ENTRY_MESSAGE( a, flag, base_type, type, name, tag ) this->sizeof_varint( this->name.bytes_size( ) ) + this->name.bytes_size( ) // GET RID OF DOUBLE bytes_size CALL!!!!
+#define SMPP_DEFINE_BYTES_SIZE_ENTRY_MESSAGE_DATA( a, flag, base_type, type, name, tag ) this->sizeof_varint( this->name.size ) + this->name.size
+
+#define SMPP_DEFINE_BYTES_SIZE_ENTRY_DATA_BYTES( a, flag, base_type, type, name, tag ) this->sizeof_varint( this->name.size ) + this->name.size
+#define SMPP_DEFINE_BYTES_SIZE_ENTRY_DATA_STRING( a, flag, base_type, type, name, tag ) this->sizeof_varint( this->name.length ) + this->name.length
+#define SMPP_DEFINE_BYTES_SIZE_ENTRY_DATA( a, flag, base_type, type, name, tag ) SMPP_DEFINE_BYTES_SIZE_ENTRY_DATA_##type( a, flag, base_type, type, name, tag )
+
+#define SMPP_DEFINE_BYTES_SIZE_ENTRY( a, flag, base_type, type, name, tag ) \
+if ( __INTERNAL_tags.is_set( tag ) ) result += SMPP_FIELD_HDR_SIZE( tag ) + ( SMPP_DEFINE_BYTES_SIZE_ENTRY_##base_type( a, flag, base_type, type, name, tag ) );
+
+// =====================================
+// 
+// 
+// 
+// =====================================
 
 #define SMPP_DEFINE_CLASS_ENTRY_BASE( a, flag, base_type, type, name, tag ) \
 bool has_##name( ) const { return this->__INTERNAL_tags.is_set( tag ); } \
@@ -367,14 +447,23 @@ void set_##name( decltype( name ) value ) { \
 
 #define SMPP_DEFINE_CLASS_ENTRY_OPTIONAL( a, flag, base_type, type, name, tag ) SMPP_DEFINE_CLASS_ENTRY_BASE_##base_type( a, flag, base_type, type, name, tag )
 #define SMPP_DEFINE_CLASS_ENTRY_REQUIRED( a, flag, base_type, type, name, tag ) SMPP_DEFINE_CLASS_ENTRY_BASE_##base_type( a, flag, base_type, type, name, tag )
-
 #define SMPP_DEFINE_CLASS_ENTRY_REPEATED( a, flag, base_type, type, name, tag ) NOT_IMPLEMENTED_YET
 
-#define SMPP_DEFINE_CLASS_ENTRY( a, flag, base_type, type, name, tag ) \
-SMPP_DEFINE_CLASS_ENTRY_##flag( a, flag, base_type, type, name, tag )
+#define SMPP_DEFINE_CLASS_ENTRY( a, flag, base_type, type, name, tag ) SMPP_DEFINE_CLASS_ENTRY_##flag( a, flag, base_type, type, name, tag )
 
-#define SMPP_DEFINE_COPY_ENTRY( a, flag, base_type, type, name, tag ) \
-this->name = other.name;
+// =====================================
+// 
+// 
+// 
+// =====================================
+
+#define SMPP_DEFINE_COPY_ENTRY( a, flag, base_type, type, name, tag ) this->name = other.name;
+
+// =====================================
+// 
+// 
+// 
+// =====================================
 
 #define SMPP_BIND( name, max_tag ) \
 struct name : public smallpp::base_message { \
@@ -394,7 +483,7 @@ public: \
 	bool parse_from_buffer( const uint8_t* buffer, size_t buffer_size ) override { \
 		auto bf = smallpp::bf_reader( buffer, buffer_size ); \
 \
-		this->__INTERNAL_tags.clear( );\
+		this->__INTERNAL_tags.clear( ); \
 \
 		field_header_s field = { }; \
 		while ( this->read_field( bf, field ) ) { \
@@ -448,14 +537,14 @@ public: \
 \
 	size_t bytes_size( ) override { \
 		size_t result = 0; \
-\
+		SMPP_FIELDS_##name( SMPP_DEFINE_BYTES_SIZE_ENTRY, 0 ) \
 		return result; \
 	} \
 \
 	void clear( ) override { \
 		this->__INTERNAL_tags.clear( ); \
-		SMPP_FIELDS_##name( SMPP_DEFINE_CONSTRUCTOR_ENTRY, 0 ) \
-} \
+		SMPP_FIELDS_##name( SMPP_DEFINE_CLEAR_ENTRY, 0 ) \
+	} \
 \
 	SMPP_FIELDS_##name( SMPP_DEFINE_CLASS_ENTRY, 0 ) \
 };
