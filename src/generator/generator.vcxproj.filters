@@ -2,9 +2,12 @@
 <Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <ItemGroup>
     <ClCompile Include="main.cpp" />
+    <ClCompile Include="parser.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="generator.h" />
-    <ClInclude Include="field_types\base_field_type.h" />
+    <ClInclude Include="io.h" />
+    <ClInclude Include="parser.h" />
+    <ClInclude Include="types.h" />
   </ItemGroup>
 </Project>
