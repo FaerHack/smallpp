@@ -5,6 +5,5 @@
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="test_message.h" />
-    <ClInclude Include="generated.h" />
   </ItemGroup>
 </Project>

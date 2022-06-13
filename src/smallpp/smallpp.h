@@ -202,14 +202,14 @@ namespace smallpp {
 			}
 
 			inline bool is_set( int n ) const {
+				if ( n > num_bits ) return false;
 				return ( ( m_data[ BITSET_INT( n ) ] & ( 1U << ( n % BITS_PER_INT ) ) ) != 0 );
 			}
 
 			inline void set( int n, bool v ) {
-				if ( v )
-					m_data[ BITSET_INT( n ) ] |= ( 1U << ( n % BITS_PER_INT ) );
-				else
-					m_data[ BITSET_INT( n ) ] &= ~( 1U << ( n % BITS_PER_INT ) );
+				if ( n > num_bits ) return;
+				if ( v ) m_data[ BITSET_INT( n ) ] |= ( 1U << ( n % BITS_PER_INT ) );
+				else m_data[ BITSET_INT( n ) ] &= ~( 1U << ( n % BITS_PER_INT ) );
 			}
 
 			inline void clear( ) {
@@ -419,7 +419,7 @@ if ( !bf.write_varint( this->name.size ) || !bf.write_data( this->name.buffer, t
 #define SMPP_DEFINE_WRITE_ENTRY_VARINT( a, flag, base_type, type, name, tag ) if ( !bf.write_varint( this->name ) ) return false;
 #define SMPP_DEFINE_WRITE_ENTRY_FIXED32( a, flag, base_type, type, name, tag ) if ( !bf.write( this->name ) ) return false;
 #define SMPP_DEFINE_WRITE_ENTRY_FIXED64( a, flag, base_type, type, name, tag ) if ( !bf.write( this->name ) ) return false;
-#define SMPP_DEFINE_WRITE_ENTRY_ENUM( a, flag, base_type, type, name, tag ) if ( !bf.write_varint( this->name ) ) return false;
+#define SMPP_DEFINE_WRITE_ENTRY_ENUM( a, flag, base_type, type, name, tag ) if ( !bf.write_varint( ( uint64_t )this->name ) ) return false;
 
 #define SMPP_DEFINE_WRITE_ENTRY_MESSAGE( a, flag, base_type, type, name, tag ) \
 const auto size = this->name.bytes_size( ); \
@@ -467,7 +467,7 @@ NOT_IMPLEMENTED_YET
 
 #define SMPP_FIELD_HDR_SIZE( tag ) varint_size_s< tag << 3 >::value
 
-#define SMPP_DEFINE_BYTES_SIZE_ENTRY_VARINT( a, flag, base_type, type, name, tag ) this->sizeof_varint( this->name )
+#define SMPP_DEFINE_BYTES_SIZE_ENTRY_VARINT( a, flag, base_type, type, name, tag ) this->sizeof_varint( ( uint64_t )this->name )
 #define SMPP_DEFINE_BYTES_SIZE_ENTRY_FIXED32( a, flag, base_type, type, name, tag ) 4
 #define SMPP_DEFINE_BYTES_SIZE_ENTRY_FIXED64( a, flag, base_type, type, name, tag ) 8
 #define SMPP_DEFINE_BYTES_SIZE_ENTRY_ENUM( a, flag, base_type, type, name, tag ) SMPP_DEFINE_BYTES_SIZE_ENTRY_VARINT( a, flag, base_type, type, name, tag )

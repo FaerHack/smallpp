@@ -1,0 +1,33 @@
+syntax = "proto3";
+option optimize_for = LITE_RUNTIME;
+
+enum e_currency {
+	unknown0 = 0;
+	unknown1 = 1;
+	unknown2 = 2;
+	ukrainian = 3;
+}
+
+message CMsgSOIDOwner {
+	optional uint32 type = 1;
+	optional uint64 id = 2;
+}
+
+message CMsgSOCacheSubscriptionCheck {
+	optional uint64 version = 2;
+	optional CMsgSOIDOwner owner_soid = 3;
+}
+
+message test_message_location {
+	optional float latitude = 1;
+	optional float longitude = 2;
+	optional string country = 3;
+}
+
+message test_message {
+	required uint32 version = 1;
+	optional bytes game_data = 2;
+	optional test_message_location location = 5;
+	optional e_currency currency = 8;
+	string txn_country_code = 11;
+}

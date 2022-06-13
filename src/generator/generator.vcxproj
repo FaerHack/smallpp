@@ -73,10 +73,12 @@
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
     <OutDir>$(SolutionDir)bin\debug\</OutDir>
     <IntDir>$(SolutionDir)obj\$(ProjectName)\</IntDir>
+    <IncludePath>$(ProjectDir);$(IncludePath)</IncludePath>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
     <OutDir>$(SolutionDir)bin\release\</OutDir>
     <IntDir>$(SolutionDir)obj\$(ProjectName)\</IntDir>
+    <IncludePath>$(ProjectDir);$(IncludePath)</IncludePath>
   </PropertyGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
     <ClCompile>
@@ -137,14 +139,15 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClCompile Include="generator\generator.cpp" />
     <ClCompile Include="main.cpp" />
-    <ClCompile Include="parser.cpp" />
+    <ClCompile Include="parser\parser.cpp" />
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="generator.h" />
-    <ClInclude Include="io.h" />
-    <ClInclude Include="parser.h" />
-    <ClInclude Include="types.h" />
+    <ClInclude Include="generator\generator.h" />
+    <ClInclude Include="parser\parser.h" />
+    <ClInclude Include="platform\io.h" />
+    <ClInclude Include="shared\types.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

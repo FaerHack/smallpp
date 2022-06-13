@@ -81,7 +81,7 @@ bool c_parser::expect( const std::wstring& text ) {
 	return !will_end( len ) && wcsncmp( m_curr, text.data( ), len ) == 0 && skip( len );
 }
 
-bool c_parser::parse_enum( parser_result_s& result ) {
+bool c_parser::parse_enum( proto_file_s& result ) {
 	proto_enum_s proto_enum = { };
 
 	if ( !read_word( proto_enum.name ) ) {
@@ -128,7 +128,7 @@ bool c_parser::parse_enum( parser_result_s& result ) {
 	return true;
 }
 
-bool c_parser::parse_message( parser_result_s& result ) {
+bool c_parser::parse_message( proto_file_s& result ) {
 	proto_message_s proto_message = { };
 
 	if ( !read_word( proto_message.name ) ) {
@@ -150,22 +150,77 @@ bool c_parser::parse_message( parser_result_s& result ) {
 			return false;
 		}
 
+		auto word_to_type = [ & ] ( const std::wstring& word, e_proto_message_type& type_result ) -> bool {
+			static std::unordered_map< std::wstring, e_proto_message_type > s_table = {
+				{ L"int32", e_proto_message_type::type_int32 },
+				{ L"int64", e_proto_message_type::type_int64 },
+				{ L"uint32", e_proto_message_type::type_uint32 },
+				{ L"uint64", e_proto_message_type::type_uint64 },
+				{ L"sint32", e_proto_message_type::type_sint32 },
+				{ L"sint64", e_proto_message_type::type_sint64 },
+				{ L"fixed32", e_proto_message_type::type_fixed32 },
+				{ L"sfixed32", e_proto_message_type::type_sfixed32 },
+				{ L"float", e_proto_message_type::type_float },
+				{ L"fixed64", e_proto_message_type::type_fixed64 },
+				{ L"sfixed64", e_proto_message_type::type_sfixed64 },
+				{ L"double", e_proto_message_type::type_double },
+				{ L"bool", e_proto_message_type::type_bool },
+				{ L"string", e_proto_message_type::type_string },
+				{ L"bytes", e_proto_message_type::type_bytes },
+			};
+
+			const auto& it = s_table.find( word );
+			if ( it == s_table.end( ) ) {
+				// looks like its not a basic type
+
+				// maybe its a message?
+				for ( const auto& msg : result.messages ) {
+					if ( word == msg.name ) {
+						type_result = e_proto_message_type::type_message;
+						entry.type_name = msg.name;
+						return true;
+					}
+				}
+
+				// maybe its an enum?
+				for ( const auto& _enum : result.enums ) {
+					if ( word == _enum.name ) {
+						type_result = e_proto_message_type::type_enum;
+						entry.type_name = _enum.name;
+						return true;
+					}
+				}
+			}
+
+			type_result = it->second;
+			return true;
+		};
+
 		if ( temp == L"required" ) {
 			entry.rule = e_proto_message_rule::required;
 		} else if ( temp == L"optional" ) {
 			entry.rule = e_proto_message_rule::optional;
 		} else if ( temp == L"repeated" ) {
 			entry.rule = e_proto_message_rule::repeated;
-			//error( "Unsupported field tag \"%s\"", entry.type.data( ) );
-			return false;
 		} else {
 			entry.rule = e_proto_message_rule::none;
-			entry.type = temp;
+			if ( !word_to_type( temp, entry.type ) ) {
+				error( "Invalid type %s in %s", temp.data( ), proto_message.name.data( ) );
+				return false;
+			}
 		}
 
 		if ( entry.rule != e_proto_message_rule::none ) {
-			if ( !read_word( entry.type ) ) {
+			// rule was specified, not type
+			// so read type again
+
+			if ( !read_word( temp ) ) {
 				error( "Unexpected end" );
+				return false;
+			}
+
+			if ( !word_to_type( temp, entry.type ) ) {
+				error( "Invalid type %s in %s", temp.data( ), proto_message.name.data( ) );
 				return false;
 			}
 		}
@@ -209,14 +264,14 @@ c_parser::c_parser( const std::wstring& content ) {
 	m_line = 0;
 }
 
-bool c_parser::parse( parser_result_s& result ) {
+bool c_parser::parse( proto_file_s& result ) {
 
 	// tokens we dont support
-	static std::unordered_set< std::wstring > g_ignore_tokens = {
+	static std::unordered_set< std::wstring > s_ignore_tokens = {
 		L"syntax", L"option", L"import"
 	};
 
-	std::unordered_map< std::wstring, std::function< bool( parser_result_s& ) > > g_handlers = {
+	std::unordered_map< std::wstring, std::function< bool( proto_file_s& ) > > g_handlers = {
 		{ L"enum", std::bind( &c_parser::parse_enum, this, _1 ) },
 		{ L"message", std::bind( &c_parser::parse_message, this, _1 ) },
 	};
@@ -231,7 +286,7 @@ bool c_parser::parse( parser_result_s& result ) {
 			break;
 
 		// ignore some token
-		if ( g_ignore_tokens.contains( token ) ) {
+		if ( s_ignore_tokens.contains( token ) ) {
 			if ( !skip_until( ';' ) )
 				break;
 			continue;

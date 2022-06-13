@@ -1,13 +1,7 @@
 #pragma once
 #include <string>
 #include <vector>
-#include "types.h"
-
-struct parser_result_s {
-	std::wstring error;
-	std::vector< proto_enum_s > enums;
-	std::vector< proto_message_s > messages;
-};
+#include "shared/types.h"
 
 class c_parser {
 private:
@@ -35,12 +29,12 @@ private:
 
 	bool expect( const std::wstring& text );
 
-	bool parse_enum( parser_result_s& result );
+	bool parse_enum( proto_file_s& result );
 	
-	bool parse_message( parser_result_s& result );
+	bool parse_message( proto_file_s& result );
 
 public:
 	c_parser( const std::wstring& content );
 
-	bool parse( parser_result_s& result );
+	bool parse( proto_file_s& result );
 };

@@ -71,12 +71,12 @@
   </ImportGroup>
   <PropertyGroup Label="UserMacros" />
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
-    <IncludePath>$(SolutionDir)src\smallpp\;$(IncludePath)</IncludePath>
+    <IncludePath>$(SolutionDir)res\;$(SolutionDir)src\smallpp\;$(IncludePath)</IncludePath>
     <OutDir>$(SolutionDir)bin\debug\</OutDir>
     <IntDir>$(SolutionDir)obj\$(ProjectName)\</IntDir>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
-    <IncludePath>$(SolutionDir)src\smallpp\;$(IncludePath)</IncludePath>
+    <IncludePath>$(SolutionDir)res\;$(SolutionDir)src\smallpp\;$(IncludePath)</IncludePath>
     <OutDir>$(SolutionDir)bin\release\</OutDir>
     <IntDir>$(SolutionDir)obj\$(ProjectName)\</IntDir>
   </PropertyGroup>
@@ -141,7 +141,6 @@
     <ClCompile Include="main.cpp" />
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="generated.h" />
     <ClInclude Include="test_message.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />

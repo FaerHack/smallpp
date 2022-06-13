@@ -1,70 +1,56 @@
-#include <Windows.h>
 #include <stdint.h>
-#include <stdio.h>
+#include <iostream>
 #include <codecvt>
+#include <filesystem>
 
-#include "io.h"
-#include "parser.h"
+#include "platform/io.h"
+#include "parser/parser.h"
+#include "generator/generator.h"
 
 int wmain( int argc, wchar_t* argv[ ] ) {
 
-	if ( argc <= 1 ) {
-		wprintf( L"Usage: %s files...\n", argv[ 0 ] );
+	if ( argc <= 2 ) {
+		std::wcout << L"Usage: " << argv[ 0 ] << " <output dir> files..." << std::endl;
 		return -1;
 	}
 
-	for ( auto i = 1; i < argc; ++i ) {
-		const std::wstring path = argv[ i ];
+	const auto output_dir = std::filesystem::path( argv[ 1 ] );
+	if ( !std::filesystem::is_directory( output_dir ) ) {
+		std::wcout << L"Output directory is invalid!" << std::endl;
+		return -1;
+	}
+
+	for ( auto i = 2; i < argc; ++i ) {
+		const auto path = std::filesystem::path( argv[ i ] );
 		auto file = io::c_text_file( path );
 
 		if ( !file.exists( ) ) {
-			wprintf( L"Failed to open %s!\n", path.data( ) );
+			std::wcout << L"Failed to open " << path << "!" << std::endl;
 			continue;
 		}
 
 		auto content = file.read_all_text( );
 		if ( content.empty( ) ) {
-			wprintf( L"Failed to read %s!\n", path.data( ) );
+			std::wcout << L"Failed to read " << path << "!" << std::endl;
 			continue;
 		}
 
-		auto parser = c_parser( content );
+		proto_file_s proto_file = { };
 
-		parser_result_s parser_result;
-		if ( !parser.parse( parser_result ) ) {
+		auto parser = c_parser( content );
+		if ( !parser.parse( proto_file ) ) {
 			//wprintf( L"Error! %s at line %d\n", parser_result.error );
 			return -1;
 		}
 
-		for ( const auto& _enum : parser_result.enums ) {
-			wprintf( L"%s:\n", _enum.name.data( ) );
-			for ( const auto& entry : _enum.entries ) {
-				wprintf( L"%s: %d\n", entry.name.data( ), entry.number );
-			}
-			wprintf( L"\n" );
-		}
-		
-		for ( const auto& message : parser_result.messages ) {
-			wprintf( L"%s:\n", message.name.data( ) );
-			for ( const auto& entry : message.entries ) {
-				std::wstring rule;
-				switch ( entry.rule ) {
-					case e_proto_message_rule::required:
-						rule = L"required";
-						break;
-					case e_proto_message_rule::optional:
-						rule = L"optional";
-						break;
-					default:
-						rule = L"        ";
-						break;
-				}
-				wprintf( L"%s %s: %s ( %d )\n", rule.data( ), entry.name.data( ), entry.type.data( ), entry.number );
-			}
-			wprintf( L"\n" );
+		const auto output_path = ( output_dir / path.filename( ) ).replace_extension( L".pb.h" );
+
+		auto generator = c_generator( output_path );
+		if ( !generator.generate( proto_file ) ) {
+			return -1;
 		}
 
-		// TODO: process in generator
+		std::wcout << L"Generated " << output_path << std::endl;
 	}
 
 	return 0;

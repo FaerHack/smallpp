@@ -8,7 +8,7 @@
 #include <string.h>
 
 #include "test_message.h"
-#include "generated.h"
+#include "test.pb.h"
 
 int main( ) {
 	test_message _msg;
