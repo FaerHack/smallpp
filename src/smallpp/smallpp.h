@@ -30,8 +30,13 @@
 #endif
 
 // TODO:
-// - Support repeated
 // - Maybe instead of true/false return error code? so we can differentiate between out_of_memory and required_field_not_set for example
+// - Support importing
+// - Support "Any" (just basically "bytes" underhood but with message setter and getter
+// - Support extensions?
+// - Support "extend" keyword
+// - Support repeated
+// - Support packages (namespaces)
 
 namespace smallpp {
 

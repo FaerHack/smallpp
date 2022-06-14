@@ -17,10 +17,10 @@ bool c_parser::is_end( ) const {
 };
 
 bool c_parser::will_end( int count ) const {
-	return m_curr + count >= m_end;
+	return m_curr + count > m_end;
 };
 
-bool c_parser::process_comments( ) {
+bool c_parser::do_comments( ) {
 	// is it a comment?
 	if ( *m_curr != '/' )
 		return true;
@@ -31,9 +31,12 @@ bool c_parser::process_comments( ) {
 
 	switch ( *( m_curr + 1 ) ) {
 		case '*':
+			if ( !skip_until( L"*/" ) )
+				return false;
 			break;
 		case '/':
-			skip_until( '\n' );
+			if ( !skip_until( '\n' ) )
+				return false;
 			break;
 		default:
 			// its okay
@@ -44,29 +47,49 @@ bool c_parser::process_comments( ) {
 };
 
 bool c_parser::skip_whitespace( ) {
-	while ( !is_end( ) && iswspace( *m_curr ) ) ++m_curr;
+	while ( !is_end( ) && do_comments( ) && iswspace( *m_curr ) ) {
+		if ( *m_curr == '\n' ) m_line++;
+		++m_curr;
+	}
 	return !is_end( );
 };
 
-bool c_parser::read_word( std::wstring& word ) {
-	const auto start = m_curr;
-	while ( !is_end( ) && ( iswalpha( *m_curr ) || iswdigit( *m_curr ) || *m_curr == '_' ) ) ++m_curr;
-	if ( is_end( ) ) return false;
-
-	word = std::wstring( start, m_curr - start );
-	return word.length( ) > 0 && skip_whitespace( );
-};
-
 bool c_parser::skip_until( wchar_t c ) {
-	while ( !is_end( ) && *m_curr != c ) ++m_curr;
+	while ( !is_end( ) && *m_curr != c ) {
+		if ( *m_curr == '\n' ) m_line++;
+		++m_curr;
+	}
+	if ( *m_curr == '\n' ) m_line++;
 	++m_curr;
 	if ( is_end( ) ) return false;
 	return skip_whitespace( );
 };
 
+bool c_parser::skip_until( const std::wstring& s ) {
+	const auto len = s.length( );
+	while ( !will_end( len ) && wcsncmp( m_curr, s.data( ), len ) != 0 ) {
+		if ( *m_curr == '\n' ) m_line++;
+		++m_curr;
+	}
+	m_curr += len;
+	if ( is_end( ) ) return false;
+	return skip_whitespace( );
+}
+
+bool c_parser::read_word( std::wstring& word ) {
+	const auto start = m_curr;
+	while ( !is_end( ) && ( iswalpha( *m_curr ) || iswdigit( *m_curr ) || *m_curr == '_' ) ) ++m_curr;
+	if ( is_end( ) ) return false;
+	//if ( !iswspace( *m_curr ) ) return false;
+	word = std::wstring( start, m_curr - start );
+	return word.length( ) > 0 && skip_whitespace( );
+};
+
 bool c_parser::skip ( int count ) {
-	if ( m_curr + count >= m_end )
+	if ( will_end( 1 ) )
 		return false;
+
+	if ( *m_curr == '\n' ) m_line++;
 
 	m_curr += count;
 	return skip_whitespace( );
@@ -151,6 +174,8 @@ bool c_parser::parse_message( proto_file_s& result ) {
 		}
 
 		auto word_to_type = [ & ] ( const std::wstring& word, e_proto_message_type& type_result ) -> bool {
+			// TODO: Allow use of custom enums with "enum" keyword
+
 			static std::unordered_map< std::wstring, e_proto_message_type > s_table = {
 				{ L"int32", e_proto_message_type::type_int32 },
 				{ L"int64", e_proto_message_type::type_int64 },
@@ -190,6 +215,9 @@ bool c_parser::parse_message( proto_file_s& result ) {
 						return true;
 					}
 				}
+
+				// nope, nothing found
+				return false;
 			}
 
 			type_result = it->second;
@@ -265,6 +293,7 @@ c_parser::c_parser( const std::wstring& content ) {
 }
 
 bool c_parser::parse( proto_file_s& result ) {
+	m_line = 1;
 
 	// tokens we dont support
 	static std::unordered_set< std::wstring > s_ignore_tokens = {
@@ -282,8 +311,10 @@ bool c_parser::parse( proto_file_s& result ) {
 
 	while ( !is_end( ) ) {
 		std::wstring token;
-		if ( !read_word( token ) )
-			break;
+		if ( !read_word( token ) ) {
+			error( L"Unexpected end" );
+			return false;
+		}
 
 		// ignore some token
 		if ( s_ignore_tokens.contains( token ) ) {

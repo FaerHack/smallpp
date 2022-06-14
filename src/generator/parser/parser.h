@@ -15,13 +15,15 @@ private:
 
 	bool will_end( int count ) const;
 
-	bool process_comments( );
+	bool do_comments( );
 
 	bool skip_whitespace( );
 
-	bool read_word( std::wstring& word );
-
 	bool skip_until( wchar_t c );
+
+	bool skip_until( const std::wstring& s );
+
+	bool read_word( std::wstring& word );
 
 	bool skip( int count );
 
