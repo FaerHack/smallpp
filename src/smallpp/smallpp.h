@@ -323,10 +323,17 @@ namespace smallpp {
 #define SMPP_WIRE_TYPE_MESSAGE e_wire_type::length_delimited
 #define SMPP_WIRE_TYPE_ENUM e_wire_type::varint
 
+#define SMPP_TYPE_DATA_BYTES smallpp::data_s
+#ifdef SMPP_ENABLE_STRINGS
+#define SMPP_TYPE_DATA_STRING std::string
+#else
+#define SMPP_TYPE_DATA_STRING smallpp::data_s
+#endif
+
 #define SMPP_BASE_TYPE_VARINT( name ) SMPP_TYPE_##name
 #define SMPP_BASE_TYPE_FIXED32( name ) SMPP_TYPE_##name
 #define SMPP_BASE_TYPE_FIXED64( name ) SMPP_TYPE_##name
-#define SMPP_BASE_TYPE_DATA( name ) smallpp::data_s
+#define SMPP_BASE_TYPE_DATA( name ) SMPP_TYPE_DATA_##name
 #define SMPP_BASE_TYPE_MESSAGE( name ) name
 #define SMPP_BASE_TYPE_MESSAGE_DATA( ... ) smallpp::data_s
 #define SMPP_BASE_TYPE_ENUM( name ) name
@@ -407,7 +414,7 @@ this->name.size = size; \
 if ( !bf.skip( size ) ) \
 	return false;
 
-#define SMPP_DEFINE_READ_TYPE_DATA( a, rule, base_type, type, name, tag ) \
+#define SMPP_DEFINE_READ_TYPE_DATA_BYTES( a, rule, base_type, type, name, tag ) \
 uint64_t size = 0; \
 if ( !bf.read_varint( size ) ) \
 	return false; \
@@ -416,6 +423,21 @@ this->name.buffer = bf.get_buffer( ); \
 this->name.size = size; \
 if ( !bf.skip( size ) ) \
 	return false;
+
+#ifdef SMPP_ENABLE_STRINGS
+#define SMPP_DEFINE_READ_TYPE_DATA_STRING( a, rule, base_type, type, name, tag ) \
+uint64_t size = 0; \
+if ( !bf.read_varint( size ) ) \
+	return false; \
+\
+this->name = { ( const char* )bf.get_buffer( ), ( const char* )bf.get_buffer( ) + size }; \
+if ( !bf.skip( size ) ) \
+	return false;
+#else
+#define SMPP_DEFINE_READ_TYPE_DATA_STRING( a, rule, base_type, type, name, tag ) SMPP_DEFINE_READ_TYPE_DATA_BYTES( a, rule, base_type, type, name, tag )
+#endif
+
+#define SMPP_DEFINE_READ_TYPE_DATA( a, rule, base_type, type, name, tag ) SMPP_DEFINE_READ_TYPE_DATA_##type( a, rule, base_type, type, name, tag )
 
 #define SMPP_DEFINE_READ_TYPE_VARINT( a, rule, base_type, type, name, tag ) SMPP_DEFINE_READ_VARINT( a, rule, base_type, type, name )
 #define SMPP_DEFINE_READ_TYPE_FIXED32( a, rule, base_type, type, name, tag ) SMPP_DEFINE_READ_TYPE( a, name )
@@ -445,6 +467,32 @@ SMPP_GET_TYPE( OPTIONAL, base_type, type_ ) value; \
 if ( !( bf.read( value ) ) ) \
 	return false; \
 this->name.push_back( value );
+
+// 
+
+#define SMPP_DEFINE_READ_REPEATED_DATA_BYTES( a, rule, base_type, type, name, tag ) \
+uint64_t size = 0; \
+if ( !bf.read_varint( size ) ) \
+	return false; \
+\
+this->name.emplace_back( bf.get_buffer( ), size ); \
+if ( !bf.skip( size ) ) \
+	return false;
+
+#ifdef SMPP_ENABLE_STRINGS
+#define SMPP_DEFINE_READ_REPEATED_DATA_STRING( a, rule, base_type, type, name, tag ) \
+uint64_t size = 0; \
+if ( !bf.read_varint( size ) ) \
+	return false; \
+\
+this->name.emplace_back( ( const char* )bf.get_buffer( ), ( const char* )bf.get_buffer( ) + size ); \
+if ( !bf.skip( size ) ) \
+	return false;
+#else
+#define SMPP_DEFINE_READ_REPEATED_DATA_STRING( a, rule, base_type, type, name, tag ) SMPP_DEFINE_READ_REPEATED_DATA_BYTES( a, rule, base_type, type, name, tag )
+#endif
+
+#define SMPP_DEFINE_READ_REPEATED_DATA( a, rule, base_type, type, name, tag ) SMPP_DEFINE_READ_REPEATED_DATA_##type( a, rule, base_type, type, name, tag )
 
 #define SMPP_DEFINE_READ_REPEATED_VARINT( a, rule, base_type, type, name, tag ) SMPP_DEFINE_READ_REPEATED_TYPE_VARINT( a, rule, base_type, type, name )
 #define SMPP_DEFINE_READ_REPEATED_FIXED32( a, rule, base_type, type, name, tag ) SMPP_DEFINE_READ_REPEATED_TYPE( a, name )
@@ -481,16 +529,26 @@ if ( !this->__INTERNAL_tags.is_set( tag ) ) return false;
 // Writing
 // 
 
-#define SMPP_DEFINE_WRITE_ENTRY_DATA( value ) \
+#define SMPP_DEFINE_WRITE_ENTRY_DATA_BYTES( type, value ) \
 if ( !bf.write_varint( value.size ) || !bf.write_data( value.buffer, value.size ) ) \
 	return false;
 
-#define SMPP_DEFINE_WRITE_ENTRY_VARINT( value ) if ( !bf.write_varint( value ) ) return false;
-#define SMPP_DEFINE_WRITE_ENTRY_FIXED32( value ) if ( !bf.write( value ) ) return false;
-#define SMPP_DEFINE_WRITE_ENTRY_FIXED64( value ) if ( !bf.write( value ) ) return false;
-#define SMPP_DEFINE_WRITE_ENTRY_ENUM( value ) if ( !bf.write_varint( ( uint64_t )value ) ) return false;
+#ifdef SMPP_ENABLE_STRINGS
+#define SMPP_DEFINE_WRITE_ENTRY_DATA_STRING( type, value ) \
+if ( !bf.write_varint( value.size( ) ) || !bf.write_data( ( const uint8_t* )value.data( ), value.size( ) ) ) \
+	return false;
+#else
+#define SMPP_DEFINE_WRITE_ENTRY_DATA_STRING( type, value ) SMPP_DEFINE_WRITE_ENTRY_DATA_BYTES( type, value )
+#endif
 
-#define SMPP_DEFINE_WRITE_ENTRY_MESSAGE( value ) \
+#define SMPP_DEFINE_WRITE_ENTRY_DATA( type, value ) SMPP_DEFINE_WRITE_ENTRY_DATA_##type( type, value )
+
+#define SMPP_DEFINE_WRITE_ENTRY_VARINT( type, value ) if ( !bf.write_varint( value ) ) return false;
+#define SMPP_DEFINE_WRITE_ENTRY_FIXED32( type, value ) if ( !bf.write( value ) ) return false;
+#define SMPP_DEFINE_WRITE_ENTRY_FIXED64( type, value ) if ( !bf.write( value ) ) return false;
+#define SMPP_DEFINE_WRITE_ENTRY_ENUM( type, value ) if ( !bf.write_varint( ( uint64_t )value ) ) return false;
+
+#define SMPP_DEFINE_WRITE_ENTRY_MESSAGE( type, value ) \
 const auto size = value.bytes_size( ); \
 const auto buffer = ( uint8_t* )SMPP_ALLOC( size ); \
 if ( buffer == nullptr ) \
@@ -505,7 +563,7 @@ if ( !bf.write_varint( size ) || !bf.write_data( buffer, size ) ) { \
 } \
 SMPP_FREE( buffer );
 
-#define SMPP_DEFINE_WRITE_ENTRY_MESSAGE_DATA( value ) \
+#define SMPP_DEFINE_WRITE_ENTRY_MESSAGE_DATA( type, value ) \
 if ( !bf.write_varint( value.size ) || !bf.write_data( value.buffer, value.size ) ) \
 	return false;
 
@@ -513,14 +571,14 @@ if ( !bf.write_varint( value.size ) || !bf.write_data( value.buffer, value.size 
 if ( this->__INTERNAL_tags.is_set( tag ) ) { \
 	if ( !this->write_field( bf, tag, SMPP_WIRE_TYPE_##base_type ) ) \
 		return false; \
-	SMPP_DEFINE_WRITE_ENTRY_##base_type( this->name ) \
+	SMPP_DEFINE_WRITE_ENTRY_##base_type( type, this->name ) \
 }
 
 #define SMPP_DEFINE_WRITE_ENTRY_REQUIRED( a, rule, base_type, type, name, tag ) \
 if ( this->__INTERNAL_tags.is_set( tag ) ) { \
 	if ( !this->write_field( bf, tag, SMPP_WIRE_TYPE_##base_type ) ) \
 		return false; \
-	SMPP_DEFINE_WRITE_ENTRY_##base_type( this->name ) \
+	SMPP_DEFINE_WRITE_ENTRY_##base_type( type, this->name ) \
 } else { \
 	return false; \
 }
@@ -529,7 +587,7 @@ if ( this->__INTERNAL_tags.is_set( tag ) ) { \
 for ( const auto& entry : this->name ) { \
 	if ( !this->write_field( bf, tag, SMPP_WIRE_TYPE_##base_type ) ) \
 		return false; \
-	SMPP_DEFINE_WRITE_ENTRY_##base_type( entry ) \
+	SMPP_DEFINE_WRITE_ENTRY_##base_type( type, entry ) \
 }
 
 #define SMPP_DEFINE_WRITE_ENTRY( a, rule, base_type, type, name, tag ) SMPP_DEFINE_WRITE_ENTRY_##rule( a, rule, base_type, type, name, tag )
@@ -538,7 +596,14 @@ for ( const auto& entry : this->name ) { \
 // bytes_size entries
 // 
 
-#define SMPP_FIELD_HDR_SIZE( tag ) varint_size_s< tag << 3 >::value
+#define SMPP_FIELD_HDR_SIZE( tag ) varint_size_s< ( tag << 3 ) >::value
+
+#define SMPP_DEFINE_BYTES_SIZE_ENTRY_DATA_BYTES( a, rule, base_type, type, name, tag ) this->sizeof_varint( this->name.size ) + this->name.size
+#ifdef SMPP_ENABLE_STRINGS
+#define SMPP_DEFINE_BYTES_SIZE_ENTRY_DATA_STRING( a, rule, base_type, type, name, tag ) this->sizeof_varint( this->name.size( ) ) + this->name.size( )
+#else
+#define SMPP_DEFINE_BYTES_SIZE_ENTRY_DATA_STRING( a, rule, base_type, type, name, tag ) SMPP_DEFINE_BYTES_SIZE_ENTRY_DATA_BYTES( a, rule, base_type, type, name, tag )
+#endif
 
 #define SMPP_DEFINE_BYTES_SIZE_ENTRY_VARINT( a, rule, base_type, type, name, tag ) this->sizeof_varint( ( uint64_t )this->name )
 #define SMPP_DEFINE_BYTES_SIZE_ENTRY_FIXED32( a, rule, base_type, type, name, tag ) 4
@@ -546,10 +611,17 @@ for ( const auto& entry : this->name ) { \
 #define SMPP_DEFINE_BYTES_SIZE_ENTRY_ENUM( a, rule, base_type, type, name, tag ) SMPP_DEFINE_BYTES_SIZE_ENTRY_VARINT( a, rule, base_type, type, name, tag )
 #define SMPP_DEFINE_BYTES_SIZE_ENTRY_MESSAGE( a, rule, base_type, type, name, tag ) this->sizeof_varint( this->name.bytes_size( ) ) + this->name.bytes_size( ) // TODO: GET RID OF DOUBLE bytes_size CALL!!!!
 #define SMPP_DEFINE_BYTES_SIZE_ENTRY_MESSAGE_DATA( a, rule, base_type, type, name, tag ) this->sizeof_varint( this->name.size ) + this->name.size
-#define SMPP_DEFINE_BYTES_SIZE_ENTRY_DATA( a, rule, base_type, type, name, tag ) this->sizeof_varint( this->name.size ) + this->name.size
+#define SMPP_DEFINE_BYTES_SIZE_ENTRY_DATA( a, rule, base_type, type, name, tag ) SMPP_DEFINE_BYTES_SIZE_ENTRY_DATA_##type( a, rule, base_type, type, name, tag )
 
 #define SMPP_DEFINE_BYTES_SIZE_ENTRY_OPTIONAL( a, rule, base_type, type, name, tag ) \
 if ( this->__INTERNAL_tags.is_set( tag ) ) result += SMPP_FIELD_HDR_SIZE( tag ) + ( SMPP_DEFINE_BYTES_SIZE_ENTRY_##base_type( a, rule, base_type, type, name, tag ) );
+
+#define SMPP_DEFINE_BYTES_SIZE_ENTRY_REPEATED_DATA_BYTES( a, rule, base_type, type, name, tag ) this->sizeof_varint( entry.size ) + entry.size
+#ifdef SMPP_ENABLE_STRINGS
+#define SMPP_DEFINE_BYTES_SIZE_ENTRY_REPEATED_DATA_STRING( a, rule, base_type, type, name, tag ) this->sizeof_varint( entry.size( ) ) + entry.size( )
+#else
+#define SMPP_DEFINE_BYTES_SIZE_ENTRY_REPEATED_DATA_STRING( a, rule, base_type, type, name, tag ) SMPP_DEFINE_BYTES_SIZE_ENTRY_REPEATED_DATA_BYTES( a, rule, base_type, type, name, tag )
+#endif
 
 // TODO: We could optimize it by calculating size for repeated fixed32/64 by multiplying it by number of entries. cba rn tho lol.
 #define SMPP_DEFINE_BYTES_SIZE_ENTRY_REPEATED_VARINT( a, rule, base_type, type, name, tag ) this->sizeof_varint( ( uint64_t )entry )
@@ -558,7 +630,7 @@ if ( this->__INTERNAL_tags.is_set( tag ) ) result += SMPP_FIELD_HDR_SIZE( tag ) 
 #define SMPP_DEFINE_BYTES_SIZE_ENTRY_REPEATED_ENUM( a, rule, base_type, type, name, tag ) SMPP_DEFINE_BYTES_SIZE_ENTRY_VARINT( a, rule, base_type, type, name, tag )
 #define SMPP_DEFINE_BYTES_SIZE_ENTRY_REPEATED_MESSAGE( a, rule, base_type, type, name, tag ) this->sizeof_varint( entry.bytes_size( ) ) + entry.bytes_size( )
 #define SMPP_DEFINE_BYTES_SIZE_ENTRY_REPEATED_MESSAGE_DATA( a, rule, base_type, type, name, tag ) this->sizeof_varint( entry.size ) + entry.size
-#define SMPP_DEFINE_BYTES_SIZE_ENTRY_REPEATED_DATA( a, rule, base_type, type, name, tag ) this->sizeof_varint( entry.size ) + entry.size
+#define SMPP_DEFINE_BYTES_SIZE_ENTRY_REPEATED_DATA( a, rule, base_type, type, name, tag ) SMPP_DEFINE_BYTES_SIZE_ENTRY_REPEATED_DATA_##type( a, rule, base_type, type, name, tag )
 
 #define SMPP_DEFINE_BYTES_SIZE_ENTRY_REPEATED( a, rule, base_type, type, name, tag ) \
 if ( this->__INTERNAL_tags.is_set( tag ) ) { \
@@ -633,20 +705,18 @@ void set_##name( decltype( name ) value ) { \
 
 #ifdef SMPP_ENABLE_STRINGS
 #define SMPP_DEFINE_CLASS_ENTRY_DATA_STRING_IMPLEMENTATION( a, rule, base_type, type, name, tag ) \
-std::string get_##name( ) const { \
-	return std::string( ( const char* )this->name.buffer, this->name.size ); \
+const std::string& get_##name( ) const { \
+	return this->name; \
 } \
 \
 void set_##name( const std::string& value ) { \
 	this->__INTERNAL_tags.set( tag, true ); \
-	this->name.buffer = ( const uint8_t* )value.data( ); \
-	this->name.size = value.size( ); \
+	this->name = value; \
 } \
-void set_##name( const char* buffer, int length = -1 ) { \
-	this->__INTERNAL_tags.set( tag, true ); \
-	this->name.buffer = ( const uint8_t* )buffer; \
-	this->name.size = length != -1 ? length : SMPP_STRLEN( buffer ); \
-}
+//void set_##name( const char* buffer, int length = -1 ) { \
+//	this->__INTERNAL_tags.set( tag, true ); \
+//	this->name = { buffer, buffer + ( length != -1 ? length : SMPP_STRLEN( buffer ) ) }; \
+//}
 #else
 #define SMPP_DEFINE_CLASS_ENTRY_DATA_STRING_IMPLEMENTATION( a, rule, base_type, type, name, tag ) \
 const decltype( name )& get_##name( ) const { \
@@ -672,7 +742,6 @@ SMPP_DEFINE_CLASS_ENTRY_DATA_STRING_IMPLEMENTATION( a, rule, base_type, type, na
 
 // REPEATED
 
-
 #define SMPP_DEFINE_CLASS_ENTRY_REPEATED_SHARED( a, rule, base_type, type, name, tag ) \
 bool has_##name( ) const { return this->__INTERNAL_tags.is_set( tag ); } \
 void clear_##name( ) { this->__INTERNAL_tags.set( tag, false ); name.clear( ); }
@@ -689,11 +758,89 @@ void add_##name( SMPP_GET_TYPE( OPTIONAL, base_type, type ) value ) { \
 	this->name.push_back( value ); \
 }
 
+//
+
+//#define SMPP_DEFINE_CLASS_ENTRY_BASE_MESSAGE( a, rule, base_type, type, name, tag ) \
+//SMPP_DEFINE_CLASS_ENTRY_SHARED( a, rule, base_type, type, name, tag ) \
+//\
+//const type& get_##name( ) const { \
+//	if ( !this->__INTERNAL_tags.is_set( tag ) ) return { }; \
+//	return this->name; \
+//} \
+//\
+//void set_##name( const type& value) { \
+//	this->__INTERNAL_tags.set( tag, true ); \
+//	this->name = value; \
+//}
+//
+//#define SMPP_DEFINE_CLASS_ENTRY_BASE_MESSAGE_DATA( a, rule, base_type, type, name, tag ) \
+//SMPP_DEFINE_CLASS_ENTRY_SHARED( a, rule, base_type, type, name, tag ) \
+//\
+//bool get_##name( type& out ) const { \
+//	if ( !this->__INTERNAL_tags.is_set( tag ) ) return false; \
+//	return out.parse_from_buffer( this->name.buffer, this->name.size ); \
+//} \
+//\
+//void set_##name( const uint8_t* buffer, size_t buffer_size ) { \
+//	this->__INTERNAL_tags.set( tag, true ); \
+//	this->name.buffer = buffer; \
+//	this->name.size = buffer_size; \
+//}
+
+#define SMPP_DEFINE_CLASS_ENTRY_REPEATED_DATA_BYTES( a, rule, base_type, type, name, tag ) \
+SMPP_DEFINE_CLASS_ENTRY_REPEATED_SHARED( a, rule, base_type, type, name, tag ) \
+\
+const SMPP_GET_TYPE( OPTIONAL, base_type, type )& get_##name( size_t index ) const { \
+	return this->name[ index ]; \
+} \
+\
+void add_##name( const SMPP_GET_TYPE( OPTIONAL, base_type, type )& value ) { \
+	this->__INTERNAL_tags.set( tag, true ); \
+	this->name.push_back( value ); \
+}
+
+#ifdef SMPP_ENABLE_STRINGS
+#define SMPP_DEFINE_CLASS_ENTRY_REPEATED_DATA_STRING_IMPLEMENTATION( a, rule, base_type, type, name, tag ) \
+const std::string& get_##name( size_t index ) const { \
+	return this->name[ index ]; \
+} \
+\
+void add_##name( const std::string& value ) { \
+	this->__INTERNAL_tags.set( tag, true ); \
+	this->name.emplace_back( value ); \
+} \
+//void add_##name( const char* buffer, int length = -1 ) { \
+//	this->__INTERNAL_tags.set( tag, true ); \
+//	this->name.buffer = ( const uint8_t* )buffer; \
+//	this->name.size = length != -1 ? length : SMPP_STRLEN( buffer ); \
+//}
+#else
+#define SMPP_DEFINE_CLASS_ENTRY_REPEATED_DATA_STRING_IMPLEMENTATION( a, rule, base_type, type, name, tag ) \
+const decltype( name )& get_##name( ) const { \
+	return this->name; \
+} \
+\
+void set_##name( const char* buffer, int length = -1 ) { \
+	this->__INTERNAL_tags.set( tag, true ); \
+	this->name.buffer = ( const uint8_t* )buffer; \
+	this->name.size = length != -1 ? length : SMPP_STRLEN( buffer ); \
+}
+#endif
+
+#define SMPP_DEFINE_CLASS_ENTRY_REPEATED_DATA_STRING( a, rule, base_type, type, name, tag ) \
+SMPP_DEFINE_CLASS_ENTRY_REPEATED_SHARED( a, rule, base_type, type, name, tag ) \
+SMPP_DEFINE_CLASS_ENTRY_REPEATED_DATA_STRING_IMPLEMENTATION( a, rule, base_type, type, name, tag )
+
+
+//
+
 #define SMPP_DEFINE_CLASS_ENTRY_REPEATED_VARINT( a, rule, base_type, type, name, tag ) SMPP_DEFINE_CLASS_ENTRY_REPEATED_BASE( a, rule, base_type, type, name, tag )
 #define SMPP_DEFINE_CLASS_ENTRY_REPEATED_FIXED32( a, rule, base_type, type, name, tag ) SMPP_DEFINE_CLASS_ENTRY_REPEATED_BASE( a, rule, base_type, type, name, tag )
 #define SMPP_DEFINE_CLASS_ENTRY_REPEATED_FIXED64( a, rule, base_type, type, name, tag ) SMPP_DEFINE_CLASS_ENTRY_REPEATED_BASE( a, rule, base_type, type, name, tag )
 #define SMPP_DEFINE_CLASS_ENTRY_REPEATED_ENUM( a, rule, base_type, type, name, tag ) SMPP_DEFINE_CLASS_ENTRY_REPEATED_BASE( a, rule, base_type, type, name, tag )
-#define SMPP_DEFINE_CLASS_ENTRY_REPEATED_DATA( a, rule, base_type, type, name, tag ) SMPP_DEFINE_CLASS_ENTRY_DATA_##type( a, rule, base_type, type, name, tag )
+#define SMPP_DEFINE_CLASS_ENTRY_REPEATED_DATA( a, rule, base_type, type, name, tag ) SMPP_DEFINE_CLASS_ENTRY_REPEATED_DATA_##type( a, rule, base_type, type, name, tag )
+
+//
 
 #define SMPP_DEFINE_CLASS_ENTRY_OPTIONAL( a, rule, base_type, type, name, tag ) SMPP_DEFINE_CLASS_ENTRY_BASE_##base_type( a, rule, base_type, type, name, tag )
 #define SMPP_DEFINE_CLASS_ENTRY_REQUIRED( a, rule, base_type, type, name, tag ) SMPP_DEFINE_CLASS_ENTRY_BASE_##base_type( a, rule, base_type, type, name, tag )
