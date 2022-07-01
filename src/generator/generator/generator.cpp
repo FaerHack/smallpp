@@ -38,8 +38,8 @@ bool c_generator::generate( proto_file_s& proto_file ) {
 					rule = L"REQUIRED";
 					break;
 				case e_proto_message_rule::repeated:
-					std::wcout << L"Error! 'repeated' field rule in " << entry.name << L" is not supported!" << std::endl;
-					return false;
+					rule = L"REPEATED";
+					break;
 				default:
 					break;
 			}

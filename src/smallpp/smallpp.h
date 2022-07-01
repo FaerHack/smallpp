@@ -219,6 +219,10 @@ namespace smallpp {
 				clear( );
 			}
 
+			bit_set( const bit_set& other ) {
+				memcpy( &m_data, &other.m_data, sizeof( m_data ) );
+			}
+
 			inline bool is_set( int n ) const {
 				if ( n > num_bits ) return false;
 				return ( ( m_data[ BITSET_INT( n ) ] & ( 1U << ( n % BITS_PER_INT ) ) ) != 0 );
@@ -401,7 +405,7 @@ auto buff = bf.get_buffer( ); \
 if ( !bf.skip( size ) ) \
 	return false; \
 \
-if ( !name.parse_from_buffer( buff, size ) ) \
+if ( !this->name.parse_from_buffer( buff, size ) ) \
 	return false;
 
 #define SMPP_DEFINE_READ_TYPE_MESSAGE_DATA( a, rule, base_type, type, name, tag ) \
@@ -468,7 +472,20 @@ if ( !( bf.read( value ) ) ) \
 	return false; \
 this->name.push_back( value );
 
-// 
+#define SMPP_DEFINE_READ_REPEATED_MESSAGE( a, rule, base_type, type, name, tag ) \
+uint64_t size = 0; \
+if ( !bf.read_varint( size ) ) \
+	return false; \
+\
+auto buff = bf.get_buffer( ); \
+if ( !bf.skip( size ) ) \
+	return false; \
+\
+type msg; \
+if ( !msg.parse_from_buffer( buff, size ) ) \
+	return false; \
+\
+this->name.emplace_back( msg );
 
 #define SMPP_DEFINE_READ_REPEATED_DATA_BYTES( a, rule, base_type, type, name, tag ) \
 uint64_t size = 0; \
@@ -760,19 +777,19 @@ void add_##name( SMPP_GET_TYPE( OPTIONAL, base_type, type ) value ) { \
 
 //
 
-//#define SMPP_DEFINE_CLASS_ENTRY_BASE_MESSAGE( a, rule, base_type, type, name, tag ) \
-//SMPP_DEFINE_CLASS_ENTRY_SHARED( a, rule, base_type, type, name, tag ) \
-//\
-//const type& get_##name( ) const { \
-//	if ( !this->__INTERNAL_tags.is_set( tag ) ) return { }; \
-//	return this->name; \
-//} \
-//\
-//void set_##name( const type& value) { \
-//	this->__INTERNAL_tags.set( tag, true ); \
-//	this->name = value; \
-//}
-//
+#define SMPP_DEFINE_CLASS_ENTRY_REPEATED_MESSAGE( a, rule, base_type, type, name, tag ) \
+SMPP_DEFINE_CLASS_ENTRY_REPEATED_SHARED( a, rule, base_type, type, name, tag ) \
+\
+const type& get_##name( size_t index ) const { \
+	if ( !this->__INTERNAL_tags.is_set( tag ) ) return { }; \
+	return this->name[ index ]; \
+} \
+\
+void add_##name( const type& value) { \
+	this->__INTERNAL_tags.set( tag, true ); \
+	this->name.emplace_back( value ); \
+}
+
 //#define SMPP_DEFINE_CLASS_ENTRY_BASE_MESSAGE_DATA( a, rule, base_type, type, name, tag ) \
 //SMPP_DEFINE_CLASS_ENTRY_SHARED( a, rule, base_type, type, name, tag ) \
 //\
@@ -864,6 +881,7 @@ public: \
 	}\
 \
 	name( const name& other ) { \
+		this->__INTERNAL_tags = other.__INTERNAL_tags; \
 		SMPP_FIELDS_##name( SMPP_DEFINE_COPY_ENTRY, 0 ) \
 	} \
 \
