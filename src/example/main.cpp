@@ -1,8 +1,8 @@
 #define SMPP_ENABLE_STRINGS
+#define SMPP_ENABLE_REPEATED
 
 #include "smallpp.h"
 
-#include <Windows.h>
 #include <stdio.h>
 #include <stdint.h>
 #include <string.h>
@@ -10,8 +10,37 @@
 #include "test_message.h"
 #include "test.pb.h"
 
+#define SMPP_FIELDS_test_repeated_message( X, a ) \
+	X( a, REPEATED, VARINT, UINT64, ids, 1 ) \
+	X( a, OPTIONAL, VARINT, UINT64, test, 2 )
+SMPP_BIND( test_repeated_message, 5 );
+
+// test:
+// - repeated string
+// - repeated message
+
 int main( ) {
-	test_message _msg;
+	test_repeated_message msg;
+	msg.set_test( 694201337 );
+	msg.add_ids( 42 );
+	msg.add_ids( 47 );
+	msg.add_ids( 69 );
+	msg.add_ids( 228 );
+	msg.add_ids( 1337 );
+	msg.add_ids( 1488 );
+	msg.add_ids( 123 );
+
+	const auto size = msg.bytes_size( );
+	auto buffer = new uint8_t[ size ];
+	auto result1 = msg.write_to_buffer( buffer, size );
+
+	test_repeated_message msg2;
+	auto result2 = msg2.parse_from_buffer( buffer, size );
+
+	delete[ ] buffer;
+	return 0;
+
+	/*test_message _msg;
 	auto result = _msg.parse_from_buffer( resources::test_message, sizeof( resources::test_message ) );
 	const auto& _location = _msg.get_location( );
 
@@ -38,5 +67,5 @@ int main( ) {
 	auto test = msg2.get_location( ).get_country( );
 
 	delete[ ] buffer;
-	return 0;
+	return 0;*/
 }
