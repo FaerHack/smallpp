@@ -1,9 +1,6 @@
 #pragma once
 #include <stdint.h>
 
-// NOTE: If you are compiling on Windows you should include this header before any <Windows.h> includes,
-//       as it contains OPTIONAL define which _WILL_ screw things up!
-
 // TODO: Describe what it does
 #ifdef SMPP_ENABLE_STRINGS
 #include <string>
@@ -342,11 +339,11 @@ namespace smallpp {
 #define SMPP_BASE_TYPE_MESSAGE_DATA( ... ) smallpp::data_s
 #define SMPP_BASE_TYPE_ENUM( name ) name
 
-#define SMPP_BASE_TYPE_OPTIONAL( base_type, type ) SMPP_BASE_TYPE_##base_type( type )
-#define SMPP_BASE_TYPE_REQUIRED( base_type, type ) SMPP_BASE_TYPE_OPTIONAL( base_type, type )
-#define SMPP_BASE_TYPE_REPEATED( base_type, type ) std::vector< SMPP_BASE_TYPE_OPTIONAL( base_type, type ) >
+#define SMPP_GET_TYPE( base_type, type ) SMPP_BASE_TYPE_##base_type( type )
 
-#define SMPP_GET_TYPE( rule, base_type, type ) SMPP_BASE_TYPE_##rule( base_type, type )
+#define SMPP_BASE_TYPE_OPTIONAL( base_type, type ) SMPP_GET_TYPE( base_type, type )
+#define SMPP_BASE_TYPE_REQUIRED( base_type, type ) SMPP_GET_TYPE( base_type, type )
+#define SMPP_BASE_TYPE_REPEATED( base_type, type ) std::vector< SMPP_GET_TYPE( base_type, type ) >
 
 // 
 // Default values
@@ -368,7 +365,7 @@ namespace smallpp {
 // Member / copy entries
 // 
 
-#define SMPP_DEFINE_MEMBER_ENTRY( a, rule, base_type, type, name, tag ) SMPP_GET_TYPE( rule, base_type, type ) name;
+#define SMPP_DEFINE_MEMBER_ENTRY( a, rule, base_type, type, name, tag ) SMPP_BASE_TYPE_##rule( base_type, type ) name;
 #define SMPP_DEFINE_COPY_ENTRY( a, rule, base_type, type, name, tag ) this->name = other.name;
 
 //
@@ -390,7 +387,7 @@ uint64_t value = 0; \
 if ( !( bf.read_varint( value ) ) ) \
 	return false; \
 \
-this->name = ( SMPP_GET_TYPE( rule, base_type, type ) )value;
+this->name = ( SMPP_GET_TYPE( base_type, type ) )value;
 
 #define SMPP_DEFINE_READ_TYPE( a, name ) \
 if ( !( bf.read( this->name ) ) ) \
@@ -464,10 +461,10 @@ uint64_t value = 0; \
 if ( !( bf.read_varint( value ) ) ) \
 	return false; \
 \
-this->name.push_back( ( SMPP_GET_TYPE( OPTIONAL, base_type, type ) )value );
+this->name.push_back( ( SMPP_GET_TYPE( base_type, type ) )value );
 
 #define SMPP_DEFINE_READ_REPEATED_TYPE( a, name ) \
-SMPP_GET_TYPE( OPTIONAL, base_type, type_ ) value; \
+SMPP_GET_TYPE( base_type, type ) value; \
 if ( !( bf.read( value ) ) ) \
 	return false; \
 this->name.push_back( value );
@@ -766,11 +763,11 @@ void clear_##name( ) { this->__INTERNAL_tags.set( tag, false ); name.clear( ); }
 #define SMPP_DEFINE_CLASS_ENTRY_REPEATED_BASE( a, rule, base_type, type, name, tag ) \
 SMPP_DEFINE_CLASS_ENTRY_REPEATED_SHARED( a, rule, base_type, type, name, tag ) \
 \
-SMPP_GET_TYPE( OPTIONAL, base_type, type ) get_##name( size_t index ) const { \
+SMPP_GET_TYPE( base_type, type ) get_##name( size_t index ) const { \
 	return this->name[ index ]; \
 } \
 \
-void add_##name( SMPP_GET_TYPE( OPTIONAL, base_type, type ) value ) { \
+void add_##name( SMPP_GET_TYPE( base_type, type ) value ) { \
 	this->__INTERNAL_tags.set( tag, true ); \
 	this->name.push_back( value ); \
 }
@@ -807,11 +804,11 @@ void add_##name( const type& value) { \
 #define SMPP_DEFINE_CLASS_ENTRY_REPEATED_DATA_BYTES( a, rule, base_type, type, name, tag ) \
 SMPP_DEFINE_CLASS_ENTRY_REPEATED_SHARED( a, rule, base_type, type, name, tag ) \
 \
-const SMPP_GET_TYPE( OPTIONAL, base_type, type )& get_##name( size_t index ) const { \
+const SMPP_GET_TYPE( base_type, type )& get_##name( size_t index ) const { \
 	return this->name[ index ]; \
 } \
 \
-void add_##name( const SMPP_GET_TYPE( OPTIONAL, base_type, type )& value ) { \
+void add_##name( const SMPP_GET_TYPE( base_type, type )& value ) { \
 	this->__INTERNAL_tags.set( tag, true ); \
 	this->name.push_back( value ); \
 }
