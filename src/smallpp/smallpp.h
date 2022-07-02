@@ -681,8 +681,7 @@ void set_##name( decltype( name ) value ) { \
 #define SMPP_DEFINE_CLASS_ENTRY_BASE_MESSAGE( a, rule, base_type, type, name, tag ) \
 SMPP_DEFINE_CLASS_ENTRY_SHARED( a, rule, base_type, type, name, tag ) \
 \
-const type& get_##name( ) const { \
-	if ( !this->__INTERNAL_tags.is_set( tag ) ) return { }; \
+type& get_##name( ) { \
 	return this->name; \
 } \
 \
@@ -777,8 +776,7 @@ void add_##name( SMPP_GET_TYPE( base_type, type ) value ) { \
 #define SMPP_DEFINE_CLASS_ENTRY_REPEATED_MESSAGE( a, rule, base_type, type, name, tag ) \
 SMPP_DEFINE_CLASS_ENTRY_REPEATED_SHARED( a, rule, base_type, type, name, tag ) \
 \
-const type& get_##name( size_t index ) const { \
-	if ( !this->__INTERNAL_tags.is_set( tag ) ) return { }; \
+type& get_##name( size_t index ) { \
 	return this->name[ index ]; \
 } \
 \
