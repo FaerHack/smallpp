@@ -757,7 +757,8 @@ SMPP_DEFINE_CLASS_ENTRY_DATA_STRING_IMPLEMENTATION( a, rule, base_type, type, na
 
 #define SMPP_DEFINE_CLASS_ENTRY_REPEATED_SHARED( a, rule, base_type, type, name, tag ) \
 bool has_##name( ) const { return this->__INTERNAL_tags.is_set( tag ); } \
-void clear_##name( ) { this->__INTERNAL_tags.set( tag, false ); name.clear( ); }
+void clear_##name( ) { this->__INTERNAL_tags.set( tag, false ); name.clear( ); } \
+const SMPP_BASE_TYPE_REPEATED( base_type, type )& get_##name( ) const { return this->##name; }
 
 #define SMPP_DEFINE_CLASS_ENTRY_REPEATED_BASE( a, rule, base_type, type, name, tag ) \
 SMPP_DEFINE_CLASS_ENTRY_REPEATED_SHARED( a, rule, base_type, type, name, tag ) \
