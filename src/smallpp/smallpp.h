@@ -267,12 +267,12 @@ namespace smallpp {
 			return bf.write_varint( ( tag << 3 ) + ( uint8_t )type );
 		}
 
-		uint32_t highest_bit( uint32_t n ) const {
+		uint32_t highest_bit_32( uint32_t n ) const {
 #if defined(__GNUC__)
-			return 63 ^ static_cast< uint32_t >( __builtin_clzll( n ) );
+			return 31 ^ static_cast< uint32_t >( __builtin_clz( n ) );
 #elif defined(_MSC_VER) && defined(_M_X64)
 			unsigned long where;
-			_BitScanReverse64( &where, n );
+			_BitScanReverse( &where, n );
 			return where;
 #else
 			if ( n == 0 )
@@ -291,8 +291,26 @@ namespace smallpp {
 #endif
 		}
 
+		uint32_t highest_bit_64( uint64_t n ) const {
+#if defined(__GNUC__)
+			return 63 ^ static_cast< uint32_t >( __builtin_clzll( n ) );
+#elif defined(_MSC_VER) && defined(_M_X64)
+			unsigned long where;
+			_BitScanReverse64( &where, n );
+			return where;
+#else
+			const uint32_t topbits = static_cast< uint32_t >( n >> 32 );
+			if ( topbits == 0 ) {
+				// Top bits are zero, so scan in bottom bits
+				return static_cast< int >( highest_bit_32( static_cast< uint32_t >( n ) ) );
+			} else {
+				return 32 + static_cast< int >( highest_bit_32( topbits ) );
+			}
+#endif
+		}
+
 		size_t sizeof_varint( uint64_t value ) const {
-			auto n = highest_bit( value | 0x1 );
+			auto n = highest_bit_64( value | 0x1 );
 			return static_cast< size_t >( ( n * 9 + 73 ) / 64 );
 		}
 
