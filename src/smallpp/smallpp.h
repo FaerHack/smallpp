@@ -217,7 +217,7 @@ namespace smallpp {
 			}
 
 			bit_set( const bit_set& other ) {
-				memcpy( &m_data, &other.m_data, sizeof( m_data ) );
+				SMPP_MEMCPY( &m_data, &other.m_data, sizeof( m_data ) );
 			}
 
 			inline bool is_set( int n ) const {
