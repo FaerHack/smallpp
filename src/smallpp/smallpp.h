@@ -390,9 +390,9 @@ namespace smallpp {
 // Clear entries
 //
 
-#define SMPP_DEFINE_CLEAR_OPTIONAL( name, base_type, type ) name = SMPP_DEFAULT_VALUE_##base_type( type )
+#define SMPP_DEFINE_CLEAR_OPTIONAL( name, base_type, type ) this->name = SMPP_DEFAULT_VALUE_##base_type( type )
 #define SMPP_DEFINE_CLEAR_REQUIRED( name, base_type, type ) SMPP_DEFINE_CLEAR_OPTIONAL( name, base_type, type )
-#define SMPP_DEFINE_CLEAR_REPEATED( name, base_type, type ) name.clear( )
+#define SMPP_DEFINE_CLEAR_REPEATED( name, base_type, type ) this->name.clear( )
 
 #define SMPP_DEFINE_CLEAR_ENTRY( a, rule, base_type, type, name, tag ) SMPP_DEFINE_CLEAR_##rule( name, base_type, type );
 
@@ -776,7 +776,7 @@ SMPP_DEFINE_CLASS_ENTRY_DATA_STRING_IMPLEMENTATION( a, rule, base_type, type, na
 
 #define SMPP_DEFINE_CLASS_ENTRY_REPEATED_SHARED( a, rule, base_type, type, name, tag ) \
 bool has_##name( ) const { return this->__INTERNAL_tags.is_set( tag ); } \
-void clear_##name( ) { this->__INTERNAL_tags.set( tag, false ); name.clear( ); } \
+void clear_##name( ) { this->__INTERNAL_tags.set( tag, false ); this->name.clear( ); } \
 const SMPP_BASE_TYPE_REPEATED( base_type, type )& get_##name( ) const { return this->##name; }
 
 #define SMPP_DEFINE_CLASS_ENTRY_REPEATED_BASE( a, rule, base_type, type, name, tag ) \
