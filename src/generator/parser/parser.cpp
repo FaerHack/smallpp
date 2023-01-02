@@ -47,7 +47,7 @@ bool c_parser::do_comments( ) {
 };
 
 bool c_parser::skip_whitespace( ) {
-	while ( !is_end( ) && do_comments( ) && (iswspace( *m_curr ) || *m_curr == '\r' ) ) {
+	while ( !is_end( ) && do_comments( ) && ( iswspace( *m_curr ) || *m_curr == '\r' ) ) {
 		if ( *m_curr == '\n' ) m_line++;
 		++m_curr;
 	}
