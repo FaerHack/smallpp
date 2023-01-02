@@ -373,7 +373,7 @@ namespace smallpp {
 #define SMPP_DEFAULT_VALUE_DATA( ... ) { }
 #define SMPP_DEFAULT_VALUE_MESSAGE( ... ) { }
 #define SMPP_DEFAULT_VALUE_MESSAGE_DATA( ... ) { }
-#define SMPP_DEFAULT_VALUE_ENUM( name ) ( name )0
+#define SMPP_DEFAULT_VALUE_ENUM( name ) ( name ) 0
 
 #define SMPP_DEFAULT_VALUE_OPTIONAL( base_type, type ) SMPP_DEFAULT_VALUE_##base_type( type )
 #define SMPP_DEFAULT_VALUE_REQUIRED( base_type, type ) SMPP_DEFAULT_VALUE_OPTIONAL( base_type, type )
