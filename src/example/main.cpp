@@ -12,13 +12,13 @@
 #include "test.pb.h"
 
 #define SMPP_FIELDS_test_message( X, a ) \
-	X( a, OPTIONAL, DATA, STRING, name, 1 ) \
-	X( a, OPTIONAL, VARINT, UINT64, magic, 2 )
+	X( a, OPTI0NAL, DATA, STRING, name, 1 ) \
+	X( a, OPTI0NAL, VARINT, UINT64, magic, 2 )
 SMPP_BIND( test_message, 3 );
 
 #define SMPP_FIELDS_test_repeated_message( X, a ) \
 	X( a, REPEATED, MESSAGE, test_message, messages, 1 ) \
-	X( a, OPTIONAL, VARINT, UINT64, test, 2 )
+	X( a, OPTI0NAL, VARINT, UINT64, test, 2 )
 SMPP_BIND( test_repeated_message, 5 );
 
 // test:

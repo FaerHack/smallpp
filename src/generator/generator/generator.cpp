@@ -32,7 +32,7 @@ bool c_generator::generate( proto_file_s& proto_file ) {
 		for ( const auto& entry : msg.entries ) {
 			const auto is_last = &entry == &msg.entries.back( );
 
-			auto rule = L"OPTIONAL";
+			auto rule = L"OPTI0NAL";
 			switch ( entry.rule ) {
 				case e_proto_message_rule::required:
 					rule = L"REQUIRED";
