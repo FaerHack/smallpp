@@ -700,7 +700,12 @@ void set_##name( SMPP_GET_TYPE( base_type, type ) value ) { \
 #define SMPP_DEFINE_CLASS_ENTRY_BASE_MESSAGE( a, rule, base_type, type, name, tag ) \
 SMPP_DEFINE_CLASS_ENTRY_SHARED( a, rule, base_type, type, name, tag ) \
 \
-type& get_##name( ) { \
+const type& get_##name( ) const { \
+	return this->name; \
+} \
+\
+type& mutable_##name( ) { \
+	this->__INTERNAL_tags.set( tag, true ); \
 	return this->name; \
 } \
 \
@@ -729,6 +734,10 @@ SMPP_DEFINE_CLASS_ENTRY_SHARED( a, rule, base_type, type, name, tag ) \
 const smallpp::data_s& get_##name( ) const { \
 	return this->name; \
 } \
+smallpp::data_s& mutable_##name( ) { \
+	this->__INTERNAL_tags.set( tag, true ); \
+	return this->name; \
+} \
 \
 void set_##name( const smallpp::data_s& value ) { \
 	this->__INTERNAL_tags.set( tag, true ); \
@@ -738,6 +747,9 @@ void set_##name( const smallpp::data_s& value ) { \
 #ifdef SMPP_ENABLE_STRINGS
 #define SMPP_DEFINE_CLASS_ENTRY_DATA_STRING_IMPLEMENTATION( a, rule, base_type, type, name, tag ) \
 const std::string& get_##name( ) const { \
+	return this->name; \
+} \
+std::string& mutable_##name( ) { \
 	return this->name; \
 } \
 \
@@ -751,7 +763,11 @@ void set_##name( const std::string& value ) { \
 //}
 #else
 #define SMPP_DEFINE_CLASS_ENTRY_DATA_STRING_IMPLEMENTATION( a, rule, base_type, type, name, tag ) \
-const char* get_##name( ) const { \
+const char* const get_##name( ) const { \
+	return this->name; \
+} \
+const char* mutable_##name( ) { \
+	this->__INTERNAL_tags.set( tag, true ); \
 	return this->name; \
 } \
 \
@@ -777,7 +793,9 @@ SMPP_DEFINE_CLASS_ENTRY_DATA_STRING_IMPLEMENTATION( a, rule, base_type, type, na
 #define SMPP_DEFINE_CLASS_ENTRY_REPEATED_SHARED( a, rule, base_type, type, name, tag ) \
 bool has_##name( ) const { return this->__INTERNAL_tags.is_set( tag ); } \
 void clear_##name( ) { this->__INTERNAL_tags.set( tag, false ); this->name.clear( ); } \
-const SMPP_BASE_TYPE_REPEATED( base_type, type )& get_##name( ) const { return this->##name; }
+size_t get_##name##_size( ) const { return this->name.size( ); } \
+const SMPP_BASE_TYPE_REPEATED( base_type, type )& get_##name( ) const { return this->##name; } \
+SMPP_BASE_TYPE_REPEATED( base_type, type )& mutable_##name( ) { this->__INTERNAL_tags.set( tag, true ); return this->##name; }
 
 #define SMPP_DEFINE_CLASS_ENTRY_REPEATED_BASE( a, rule, base_type, type, name, tag ) \
 SMPP_DEFINE_CLASS_ENTRY_REPEATED_SHARED( a, rule, base_type, type, name, tag ) \
@@ -796,7 +814,12 @@ void add_##name( SMPP_GET_TYPE( base_type, type ) value ) { \
 #define SMPP_DEFINE_CLASS_ENTRY_REPEATED_MESSAGE( a, rule, base_type, type, name, tag ) \
 SMPP_DEFINE_CLASS_ENTRY_REPEATED_SHARED( a, rule, base_type, type, name, tag ) \
 \
-type& get_##name( size_t index ) { \
+const type& get_##name( size_t index ) const { \
+	return this->name[ index ]; \
+} \
+\
+type& mutable_##name( size_t index ) { \
+	this->__INTERNAL_tags.set( tag, true ); \
 	return this->name[ index ]; \
 } \
 \
@@ -822,7 +845,12 @@ void add_##name( const type& value) { \
 #define SMPP_DEFINE_CLASS_ENTRY_REPEATED_DATA_BYTES( a, rule, base_type, type, name, tag ) \
 SMPP_DEFINE_CLASS_ENTRY_REPEATED_SHARED( a, rule, base_type, type, name, tag ) \
 \
-const SMPP_GET_TYPE( base_type, type )& get_##name( size_t index ) const { \
+const smallpp::data_s& get_##name( size_t index ) const { \
+	return this->name[ index ]; \
+} \
+\
+smallpp::data_s& mutable_##name( size_t index ) { \
+	this->__INTERNAL_tags.set( tag, true ); \
 	return this->name[ index ]; \
 } \
 \
@@ -834,6 +862,11 @@ void add_##name( const SMPP_GET_TYPE( base_type, type )& value ) { \
 #ifdef SMPP_ENABLE_STRINGS
 #define SMPP_DEFINE_CLASS_ENTRY_REPEATED_DATA_STRING_IMPLEMENTATION( a, rule, base_type, type, name, tag ) \
 const std::string& get_##name( size_t index ) const { \
+	return this->name[ index ]; \
+} \
+\
+std::string& mutable_##name( size_t index ) { \
+	this->__INTERNAL_tags.set( tag, true ); \
 	return this->name[ index ]; \
 } \
 \
@@ -849,6 +882,11 @@ void add_##name( const std::string& value ) { \
 #else
 #define SMPP_DEFINE_CLASS_ENTRY_REPEATED_DATA_STRING_IMPLEMENTATION( a, rule, base_type, type, name, tag ) \
 const char* const get_##name( ) const { \
+	return this->name; \
+} \
+\
+const char* mutable_##name( ) { \
+	this->__INTERNAL_tags.set( tag, true ); \
 	return this->name; \
 } \
 \
