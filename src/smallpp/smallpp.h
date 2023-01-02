@@ -683,7 +683,7 @@ if ( this->__INTERNAL_tags.is_set( tag ) ) { \
 
 #define SMPP_DEFINE_CLASS_ENTRY_SHARED( a, rule, base_type, type, name, tag ) \
 bool has_##name( ) const { return this->__INTERNAL_tags.is_set( tag ); } \
-void clear_##name( ) { return this->__INTERNAL_tags.set( tag, false ); }
+void clear_##name( ) { this->__INTERNAL_tags.set( tag, false ); SMPP_DEFINE_CLEAR_ENTRY( a, rule, base_type, type, name, tag ); }
 
 #define SMPP_DEFINE_CLASS_ENTRY_BASE( a, rule, base_type, type, name, tag ) \
 SMPP_DEFINE_CLASS_ENTRY_SHARED( a, rule, base_type, type, name, tag ) \
