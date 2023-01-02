@@ -688,11 +688,11 @@ void clear_##name( ) { return this->__INTERNAL_tags.set( tag, false ); }
 #define SMPP_DEFINE_CLASS_ENTRY_BASE( a, rule, base_type, type, name, tag ) \
 SMPP_DEFINE_CLASS_ENTRY_SHARED( a, rule, base_type, type, name, tag ) \
 \
-decltype( name ) get_##name( ) const { \
+SMPP_GET_TYPE( base_type, type ) get_##name( ) const { \
 	return this->name; \
 } \
 \
-void set_##name( decltype( name ) value ) { \
+void set_##name( SMPP_GET_TYPE( base_type, type ) value ) { \
 	this->__INTERNAL_tags.set( tag, true ); \
 	this->name = value; \
 }
@@ -726,11 +726,11 @@ void set_##name( const uint8_t* buffer, size_t buffer_size ) { \
 #define SMPP_DEFINE_CLASS_ENTRY_DATA_BYTES( a, rule, base_type, type, name, tag ) \
 SMPP_DEFINE_CLASS_ENTRY_SHARED( a, rule, base_type, type, name, tag ) \
 \
-const decltype( name )& get_##name( ) const { \
+const smallpp::data_s& get_##name( ) const { \
 	return this->name; \
 } \
 \
-void set_##name( decltype( name ) value ) { \
+void set_##name( const smallpp::data_s& value ) { \
 	this->__INTERNAL_tags.set( tag, true ); \
 	this->name = value; \
 }
@@ -751,7 +751,7 @@ void set_##name( const std::string& value ) { \
 //}
 #else
 #define SMPP_DEFINE_CLASS_ENTRY_DATA_STRING_IMPLEMENTATION( a, rule, base_type, type, name, tag ) \
-const decltype( name )& get_##name( ) const { \
+const char* get_##name( ) const { \
 	return this->name; \
 } \
 \
@@ -848,7 +848,7 @@ void add_##name( const std::string& value ) { \
 //}
 #else
 #define SMPP_DEFINE_CLASS_ENTRY_REPEATED_DATA_STRING_IMPLEMENTATION( a, rule, base_type, type, name, tag ) \
-const decltype( name )& get_##name( ) const { \
+const char* const get_##name( ) const { \
 	return this->name; \
 } \
 \
