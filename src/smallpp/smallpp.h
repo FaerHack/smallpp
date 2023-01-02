@@ -757,6 +757,8 @@ void set_##name( const std::string& value ) { \
 	this->__INTERNAL_tags.set( tag, true ); \
 	this->name = value; \
 } \
+// I dont remember why i commented it out, but maybe because compiler was confused and keep using this
+// method instead of the right one for std::string. maybe i will test later and uncomment it. maybe. \
 //void set_##name( const char* buffer, int length = -1 ) { \
 //	this->__INTERNAL_tags.set( tag, true ); \
 //	this->name = { buffer, buffer + ( length != -1 ? length : SMPP_STRLEN( buffer ) ) }; \
