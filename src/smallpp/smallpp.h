@@ -26,12 +26,12 @@
 // TODO: Describe what it does
 #ifndef SMPP_ALLOC
 #include <malloc.h>
-#define SMPP_ALLOC( size ) _alloca( size )
+#define SMPP_ALLOC( var_name, size ) var_name = _alloca( size )
 #endif
 
 // Added just in case
 #ifndef SMPP_FREE
-#define SMPP_FREE( ... )
+#define SMPP_FREE( var_name )
 #endif
 
 // TODO:
@@ -582,14 +582,15 @@ if ( !bf.write_varint( value.size( ) ) || !bf.write_data( ( const uint8_t* )valu
 
 #define SMPP_DEFINE_WRITE_ENTRY_MESSAGE( type, value ) \
 const auto size = value.bytes_size( ); \
-const auto buffer = ( uint8_t* )SMPP_ALLOC( size ); \
+void* buffer = nullptr; \
+SMPP_ALLOC( buffer, size ); \
 if ( buffer == nullptr ) \
 	return false; \
-if ( !value.write_to_buffer( buffer, size ) ) { \
+if ( !value.write_to_buffer( ( uint8_t* )buffer, size ) ) { \
 	SMPP_FREE( buffer ); \
 	return false; \
 } \
-if ( !bf.write_varint( size ) || !bf.write_data( buffer, size ) ) { \
+if ( !bf.write_varint( size ) || !bf.write_data( ( uint8_t* )buffer, size ) ) { \
 	SMPP_FREE( buffer ); \
 	return false; \
 } \
