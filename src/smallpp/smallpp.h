@@ -854,7 +854,7 @@ smallpp::data_s& mutable_##name( size_t index ) { \
 	return this->name[ index ]; \
 } \
 \
-void add_##name( const SMPP_GET_TYPE( base_type, type )& value ) { \
+void add_##name( const smallpp::data_s& value ) { \
 	this->__INTERNAL_tags.set( tag, true ); \
 	this->name.push_back( value ); \
 }
