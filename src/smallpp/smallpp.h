@@ -933,7 +933,7 @@ private: \
 public: \
 	name( ) { \
 		this->clear( ); \
-	}\
+	} \
 \
 	name( const name& other ) { \
 		this->__INTERNAL_tags = other.__INTERNAL_tags; \
