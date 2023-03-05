@@ -11,6 +11,13 @@
 #include <vector>
 #endif
 
+// Disables virtual functions and prevents vtable generation for each message class
+#ifdef SMPP_DISABLE_VTABLES
+#define SMPP_VIRTUAL_OVERRIDE 
+#else
+#define SMPP_VIRTUAL_OVERRIDE override
+#endif
+
 // TODO: Describe what it does
 #ifndef SMPP_MEMCPY
 #include <string.h>
@@ -314,11 +321,13 @@ namespace smallpp {
 			return static_cast< size_t >( ( n * 9 + 73 ) / 64 );
 		}
 
+#ifndef SMPP_DISABLE_VTABLES
 	public:
 		virtual bool parse_from_buffer( const uint8_t* buffer, size_t buffer_size ) = 0;
 		virtual bool write_to_buffer( uint8_t* buffer, size_t buffer_size ) const = 0;
 		virtual size_t bytes_size( ) const = 0;
 		virtual void clear( ) = 0;
+#endif
 	};
 
 }
@@ -940,7 +949,7 @@ public: \
 		SMPP_FIELDS_##name( SMPP_DEFINE_COPY_ENTRY, 0 ) \
 	} \
 \
-	bool parse_from_buffer( const uint8_t* buffer, size_t buffer_size ) override { \
+	bool parse_from_buffer( const uint8_t* buffer, size_t buffer_size ) SMPP_VIRTUAL_OVERRIDE { \
 		auto bf = bf_reader( buffer, buffer_size ); \
 \
 		this->__INTERNAL_tags.clear( ); \
@@ -981,19 +990,19 @@ public: \
 		return true; \
 	} \
 \
-	bool write_to_buffer( uint8_t* buffer, size_t buffer_size ) const override { \
+	bool write_to_buffer( uint8_t* buffer, size_t buffer_size ) const SMPP_VIRTUAL_OVERRIDE { \
 		auto bf = bf_writer( buffer, buffer_size ); \
 		SMPP_FIELDS_##name( SMPP_DEFINE_WRITE_ENTRY, 0 ) \
 		return true; \
 	} \
 \
-	size_t bytes_size( ) const override { \
+	size_t bytes_size( ) const SMPP_VIRTUAL_OVERRIDE { \
 		size_t result = 0; \
 		SMPP_FIELDS_##name( SMPP_DEFINE_BYTES_SIZE_ENTRY, 0 ) \
 		return result; \
 	} \
 \
-	void clear( ) override { \
+	void clear( ) SMPP_VIRTUAL_OVERRIDE { \
 		this->__INTERNAL_tags.clear( ); \
 		SMPP_FIELDS_##name( SMPP_DEFINE_CLEAR_ENTRY, 0 ) \
 	} \
