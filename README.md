@@ -5,16 +5,16 @@ Extremely tiny C++ single-header library that implements basics of Protobuf prot
 Meant to be used in embeded systems or places where using standard library is not ideal.
 
 ## Features
-[X] Serializing and deserializing with zero allocations.
-[X] Can be configured to not use standard library.
-[X] Can be configured to use or disable virtual method table.
-[X] Consists only of code. Doesn't provide ANY metadata or other garbage.
-[X] Supports repeated fields (currently only via vectors from standard library).
-[X] Supports custom allocators (you can even allocate on stack).
-[X] Supports all the scalar types protobuf supports.
-[X] Supports message fields.
-[X] Supports enums.
-[X] Follows proto 2 syntax.
+- [X] Serializing and deserializing with zero allocations.
+- [X] Can be configured to not use standard library.
+- [X] Can be configured to use or disable virtual method table.
+- [X] Consists only of code. Doesn't provide ANY metadata or other garbage.
+- [X] Supports repeated fields (currently only via vectors from standard library).
+- [X] Supports custom allocators (you can even allocate on stack).
+- [X] Supports all the scalar types protobuf supports.
+- [X] Supports message fields.
+- [X] Supports enums.
+- [X] Follows proto 2 syntax.
 
 ## Cons
 - Currently only works with proto 2 syntax.
