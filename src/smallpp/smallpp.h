@@ -33,12 +33,20 @@
 // TODO: Describe what it does
 #ifndef SMPP_ALLOC
 #include <malloc.h>
+# ifdef _WIN32
 #define SMPP_ALLOC( var_name, size ) var_name = _alloca( size )
+# else
+#define SMPP_ALLOC( var_name, size ) var_name = malloc( size )
+# endif
 #endif
 
 // Added just in case
 #ifndef SMPP_FREE
+# ifdef _WIN32
 #define SMPP_FREE( var_name )
+# else
+#define SMPP_FREE( var_name ) free( var_name )
+# endif
 #endif
 
 // TODO:
@@ -805,8 +813,8 @@ SMPP_DEFINE_CLASS_ENTRY_DATA_STRING_IMPLEMENTATION( a, rule, base_type, type, na
 bool has_##name( ) const { return this->__INTERNAL_tags.is_set( tag ); } \
 void clear_##name( ) { this->__INTERNAL_tags.set( tag, false ); this->name.clear( ); } \
 size_t get_##name##_size( ) const { return this->name.size( ); } \
-const SMPP_BASE_TYPE_REPEATED( base_type, type )& get_##name( ) const { return this->##name; } \
-SMPP_BASE_TYPE_REPEATED( base_type, type )& mutable_##name( ) { this->__INTERNAL_tags.set( tag, true ); return this->##name; }
+const SMPP_BASE_TYPE_REPEATED( base_type, type )& get_##name( ) const { return this->name; } \
+SMPP_BASE_TYPE_REPEATED( base_type, type )& mutable_##name( ) { this->__INTERNAL_tags.set( tag, true ); return this->name; }
 
 #define SMPP_DEFINE_CLASS_ENTRY_REPEATED_BASE( a, rule, base_type, type, name, tag ) \
 SMPP_DEFINE_CLASS_ENTRY_REPEATED_SHARED( a, rule, base_type, type, name, tag ) \

@@ -1,7 +1,6 @@
 #define SMPP_ENABLE_STRINGS
 #define SMPP_ENABLE_REPEATED
 
-#include <Windows.h>
 #include "smallpp.h"
 
 #include <stdio.h>
